@@ -5,3 +5,10 @@ authors = ["Min Kim <msk@dolbo.net>"]
 edition = "2018"
 
 [dependencies]
+itertools = "0.9"
+ndarray = "0.13"
+ndarray-linalg = { version = "0.12", features = ["intel-mkl"] }
+num-traits = "0.2"
+
+[dev-dependencies]
+float-cmp = "0.8"

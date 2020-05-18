@@ -8,7 +8,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macOS-latest, windows-latest]
-        rust: [stable, 1.37.0]
+        rust: [stable, 1.38.0]
 
     steps:
     - name: Install Rust
@@ -25,7 +25,9 @@ jobs:
       run: cargo test --verbose
     - name: Generate coverage report
       if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
-      run: cargo tarpaulin --out Xml
+      run: |
+        export LD_LIBRARY_PATH=`ls -d target/debug/build/intel-mkl-src-*/out`
+        cargo tarpaulin --out Xml
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       uses: codecov/codecov-action@master
