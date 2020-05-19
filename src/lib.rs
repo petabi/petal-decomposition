@@ -1,5 +1,6 @@
 use itertools::izip;
 use ndarray::{s, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr};
+pub use ndarray_linalg::error::LinalgError;
 use ndarray_linalg::{Lapack, Scalar, SVD};
 use num_traits::real::Real;
 
@@ -16,6 +17,11 @@ impl Pca {
 
     /// Applies dimensionality reduction on `input`.
     ///
+    /// # Errors
+    ///
+    /// Returns `LinalgError` if the underlying Singular Vector Decomposition
+    /// routine fails.
+    ///
     /// # Examples
     ///
     /// ```
@@ -24,10 +30,13 @@ impl Pca {
     /// use petal_decomposition::Pca;
     ///
     /// let x = arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
-    /// let y = Pca::new(1).fit_transform(&x);  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
+    /// let y = Pca::new(1).fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
     /// assert!(approx_eq!(f64, (y[(0, 0)] - y[(2, 0)]).abs(), 2_f64.sqrt() * 2.));
     /// ```
-    pub fn fit_transform<A, S>(&mut self, input: &ArrayBase<S, Ix2>) -> ArrayBase<OwnedRepr<A>, Ix2>
+    pub fn fit_transform<A, S>(
+        &mut self,
+        input: &ArrayBase<S, Ix2>,
+    ) -> Result<ArrayBase<OwnedRepr<A>, Ix2>, LinalgError>
     where
         A: Scalar + Lapack,
         S: Data<Elem = A>,
@@ -43,10 +52,10 @@ impl Pca {
             }
             x
         };
-        let (u, sigma, _vt) = x.svd(true, false).unwrap();
+        let (u, sigma, _vt) = x.svd(true, false)?;
         let mut u = u.expect("`svd` should return `u`");
         svd_flip(&mut u);
-        unsafe {
+        Ok(unsafe {
             let mut y: ArrayBase<OwnedRepr<A>, Ix2> =
                 ArrayBase::uninitialized((input.nrows(), self.n_components));
             for (y_row, u_row) in y
@@ -59,7 +68,7 @@ impl Pca {
                 }
             }
             y
-        }
+        })
     }
 }
 
@@ -107,7 +116,7 @@ mod test {
     fn pca() {
         let x = arr2(&[[0_f64, 0_f64], [3_f64, 4_f64], [6_f64, 8_f64]]);
         let mut pca = super::Pca::new(1);
-        let y = pca.fit_transform(&x);
+        let y = pca.fit_transform(&x).unwrap();
         assert!(approx_eq!(f64, (y[(0, 0)] - y[(2, 0)]).abs(), 10.));
         assert!(approx_eq!(f64, y[(1, 0)], 0.));
     }
