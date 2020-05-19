@@ -1,10 +1,22 @@
+use crate::DecompositionError;
 use itertools::izip;
 use ndarray::{s, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr};
-pub use ndarray_linalg::error::LinalgError;
 use ndarray_linalg::{Lapack, Scalar, SVD};
 use num_traits::real::Real;
 
 /// Principal component analysis.
+///
+/// # Examples
+///
+/// ```
+/// use float_cmp::approx_eq;
+/// use ndarray::arr2;
+/// use petal_decomposition::Pca;
+///
+/// let x = arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
+/// let y = Pca::new(1).fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
+/// assert!(approx_eq!(f64, (y[(0, 0)] - y[(2, 0)]).abs(), 2_f64.sqrt() * 2.));
+/// ```
 pub struct Pca {
     n_components: usize,
 }
@@ -21,26 +33,22 @@ impl Pca {
     ///
     /// Returns `LinalgError` if the underlying Singular Vector Decomposition
     /// routine fails.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use float_cmp::approx_eq;
-    /// use ndarray::arr2;
-    /// use petal_decomposition::Pca;
-    ///
-    /// let x = arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
-    /// let y = Pca::new(1).fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
-    /// assert!(approx_eq!(f64, (y[(0, 0)] - y[(2, 0)]).abs(), 2_f64.sqrt() * 2.));
-    /// ```
     pub fn fit_transform<A, S>(
         &mut self,
         input: &ArrayBase<S, Ix2>,
-    ) -> Result<ArrayBase<OwnedRepr<A>, Ix2>, LinalgError>
+    ) -> Result<ArrayBase<OwnedRepr<A>, Ix2>, DecompositionError>
     where
         A: Scalar + Lapack,
         S: Data<Elem = A>,
     {
+        if input.shape().iter().any(|v| *v < self.n_components) {
+            return Err(DecompositionError::InvalidInput {
+                n_components: self.n_components,
+                n_rows: input.shape()[0],
+                n_cols: input.shape()[1],
+            });
+        }
+
         let x = unsafe {
             let mut x: ArrayBase<OwnedRepr<A>, Ix2> = ArrayBase::uninitialized(input.dim());
             for (input_col, x_col) in input.lanes(Axis(0)).into_iter().zip(x.lanes_mut(Axis(0))) {
