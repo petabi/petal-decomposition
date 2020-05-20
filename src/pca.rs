@@ -17,14 +17,24 @@ use num_traits::real::Real;
 /// let y = Pca::new(1).fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
 /// assert!(approx_eq!(f64, (y[(0, 0)] - y[(2, 0)]).abs(), 2_f64.sqrt() * 2.));
 /// ```
-pub struct Pca {
+pub struct Pca<A>
+where
+    A: Scalar,
+{
     n_components: usize,
+    components: Array2<A>,
 }
 
-impl Pca {
+impl<A> Pca<A>
+where
+    A: Scalar + Lapack,
+{
     #[must_use]
     pub fn new(n_components: usize) -> Self {
-        Pca { n_components }
+        Pca {
+            n_components,
+            components: Array2::<A>::eye(0),
+        }
     }
 
     /// Applies dimensionality reduction on `input`.
@@ -33,12 +43,11 @@ impl Pca {
     ///
     /// Returns `LinalgError` if the underlying Singular Vector Decomposition
     /// routine fails.
-    pub fn fit_transform<A, S>(
+    pub fn fit_transform<S>(
         &mut self,
         input: &ArrayBase<S, Ix2>,
-    ) -> Result<ArrayBase<OwnedRepr<A>, Ix2>, DecompositionError>
+    ) -> Result<Array2<A>, DecompositionError>
     where
-        A: Scalar + Lapack,
         S: Data<Elem = A>,
     {
         if input.shape().iter().any(|v| *v < self.n_components) {
@@ -50,7 +59,7 @@ impl Pca {
         }
 
         let x = unsafe {
-            let mut x: ArrayBase<OwnedRepr<A>, Ix2> = ArrayBase::uninitialized(input.dim());
+            let mut x = Array2::<A>::uninitialized(input.dim());
             for (input_col, x_col) in input.lanes(Axis(0)).into_iter().zip(x.lanes_mut(Axis(0))) {
                 if let Some(mean) = input_col.mean() {
                     for (iv, xv) in input_col.into_iter().zip(x_col) {
@@ -60,9 +69,10 @@ impl Pca {
             }
             x
         };
-        let (u, sigma, _vt) = x.svd(true, false)?;
+        let (u, sigma, vt) = x.svd(true, true)?;
         let mut u = u.expect("`svd` should return `u`");
-        svd_flip(&mut u);
+        self.components = vt.expect("`svd` should return `vt`");
+        svd_flip(&mut u, &mut self.components);
         Ok(unsafe {
             let mut y: ArrayBase<OwnedRepr<A>, Ix2> =
                 ArrayBase::uninitialized((input.nrows(), self.n_components));
@@ -82,11 +92,11 @@ impl Pca {
 
 /// Makes `SVD`'s output deterministic using the columns of `u` as the basis for
 /// sign flipping.
-fn svd_flip<A>(u: &mut Array2<A>)
+fn svd_flip<A>(u: &mut Array2<A>, v: &mut Array2<A>)
 where
     A: Scalar,
 {
-    for u_col in u.lanes_mut(Axis(0)) {
+    for (u_col, v_row) in u.lanes_mut(Axis(0)).into_iter().zip(v.lanes_mut(Axis(1))) {
         let mut u_col_iter = u_col.iter();
         let e = if let Some(e) = u_col_iter.next() {
             *e
@@ -108,8 +118,12 @@ where
             };
         }
         if signum < A::zero().re() {
+            let signum = A::from_real(signum);
             for e in u_col {
-                *e *= A::from_real(signum);
+                *e *= signum;
+            }
+            for e in v_row {
+                *e *= signum;
             }
         }
     }
@@ -132,7 +146,9 @@ mod test {
     #[test]
     fn svd_flip() {
         let mut u = arr2(&[[2., -1., 3.], [-1., -3., 2.]]);
-        super::svd_flip(&mut u);
+        let mut v = arr2(&[[1., 1.], [-2., 2.], [3., -3.]]);
+        super::svd_flip(&mut u, &mut v);
         assert_eq!(u, arr2(&[[2., 1., 3.], [-1., 3., 2.]]));
+        assert_eq!(v, arr2(&[[1., 1.], [2., -2.], [3., -3.]]));
     }
 }
