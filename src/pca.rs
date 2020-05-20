@@ -1,6 +1,6 @@
 use crate::DecompositionError;
 use itertools::izip;
-use ndarray::{s, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr};
+use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr};
 use ndarray_linalg::{Lapack, Scalar, SVD};
 use num_traits::real::Real;
 
@@ -21,28 +21,69 @@ pub struct Pca<A>
 where
     A: Scalar,
 {
-    n_components: usize,
     components: Array2<A>,
+    means: Array1<A>,
 }
 
 impl<A> Pca<A>
 where
     A: Scalar + Lapack,
 {
+    /// Initializes `Pca` for `n_components` components.
     #[must_use]
     pub fn new(n_components: usize) -> Self {
         Pca {
-            n_components,
-            components: Array2::<A>::eye(0),
+            components: Array2::<A>::zeros((n_components, 0)),
+            means: Array1::<A>::zeros(0),
         }
     }
 
-    /// Applies dimensionality reduction on `input`.
+    /// Returns the number of components.
+    #[must_use]
+    pub fn n_components(&self) -> usize {
+        self.components.nrows()
+    }
+
+    /// Fits the model with `input`.
     ///
     /// # Errors
     ///
-    /// Returns `LinalgError` if the underlying Singular Vector Decomposition
-    /// routine fails.
+    /// * `DecompositionError::InvalidInput` if any of the dimensions of `input`
+    ///   is less than the number of components.
+    /// * `DecompositionError::LinalgError` if the underlying Singular Vector
+    ///   Decomposition routine fails.
+    pub fn fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<(), DecompositionError>
+    where
+        S: Data<Elem = A>,
+    {
+        self.inner_fit(input)?;
+        Ok(())
+    }
+
+    /// Applies dimensionality reduction to `input`.
+    ///
+    /// # Errors
+    ///
+    /// * `DecompositionError::InvalidInput` if the number of features in
+    ///   `input` does not match that of the training data.
+    pub fn transform<S>(&self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, DecompositionError>
+    where
+        S: Data<Elem = A>,
+    {
+        if input.ncols() != self.means.len() {
+            return Err(DecompositionError::InvalidInput);
+        }
+        let x = input - &self.means;
+        Ok(x.dot(&self.components.t()))
+    }
+
+    /// Fits the model with `input` and apply the dimensionality reduction on
+    /// `input`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DecompositionError::LinalgError` if the underlying Singular
+    /// Vector Decomposition routine fails.
     pub fn fit_transform<S>(
         &mut self,
         input: &ArrayBase<S, Ix2>,
@@ -50,36 +91,14 @@ where
     where
         S: Data<Elem = A>,
     {
-        if input.shape().iter().any(|v| *v < self.n_components) {
-            return Err(DecompositionError::InvalidInput {
-                n_components: self.n_components,
-                n_rows: input.shape()[0],
-                n_cols: input.shape()[1],
-            });
-        }
-
-        let x = unsafe {
-            let mut x = Array2::<A>::uninitialized(input.dim());
-            for (input_col, x_col) in input.lanes(Axis(0)).into_iter().zip(x.lanes_mut(Axis(0))) {
-                if let Some(mean) = input_col.mean() {
-                    for (iv, xv) in input_col.into_iter().zip(x_col) {
-                        *xv = *iv - mean;
-                    }
-                }
-            }
-            x
-        };
-        let (u, sigma, vt) = x.svd(true, true)?;
-        let mut u = u.expect("`svd` should return `u`");
-        self.components = vt.expect("`svd` should return `vt`");
-        svd_flip(&mut u, &mut self.components);
+        let (u, sigma) = self.inner_fit(input)?;
         Ok(unsafe {
             let mut y: ArrayBase<OwnedRepr<A>, Ix2> =
-                ArrayBase::uninitialized((input.nrows(), self.n_components));
+                ArrayBase::uninitialized((input.nrows(), self.n_components()));
             for (y_row, u_row) in y
                 .lanes_mut(Axis(1))
                 .into_iter()
-                .zip(u.slice(s![.., 0..self.n_components]).lanes(Axis(1)))
+                .zip(u.slice(s![.., 0..self.n_components()]).lanes(Axis(1)))
             {
                 for (y_v, u_v, sigma_v) in izip!(y_row.into_iter(), u_row, &sigma) {
                     *y_v = *u_v * A::from_real(*sigma_v);
@@ -87,6 +106,44 @@ where
             }
             y
         })
+    }
+
+    /// Fits the model with `input`.
+    ///
+    /// # Errors
+    ///
+    /// * `DecompositionError::InvalidInput` if any of the dimensions of `input`
+    ///   is less than the number of components.
+    /// * `DecompositionError::LinalgError` if the underlying Singular Vector
+    ///   Decomposition routine fails.
+    fn inner_fit<S>(
+        &mut self,
+        input: &ArrayBase<S, Ix2>,
+    ) -> Result<(Array2<A>, Array1<A::Real>), DecompositionError>
+    where
+        S: Data<Elem = A>,
+    {
+        if input.shape().iter().any(|v| *v < self.n_components()) {
+            return Err(DecompositionError::InvalidInput);
+        }
+
+        let means = if let Some(means) = input.mean_axis(Axis(0)) {
+            means
+        } else {
+            return Ok((
+                Array2::<A>::zeros((0, input.ncols())),
+                Array1::<A::Real>::zeros(input.ncols()),
+            ));
+        };
+        let x = input - &means;
+        let (u, sigma, vt) = x.svd(true, true)?;
+        let mut u = u.expect("`svd` should return `u`");
+        let mut vt = vt.expect("`svd` should return `vt`");
+        svd_flip(&mut u, &mut vt);
+        self.components = vt.slice(s![0..self.n_components(), ..]).into_owned();
+        self.means = means;
+
+        Ok((u, sigma))
     }
 }
 
@@ -132,13 +189,34 @@ where
 #[cfg(test)]
 mod test {
     use float_cmp::approx_eq;
-    use ndarray::arr2;
+    use ndarray::{arr2, Array2};
+
+    #[test]
+    fn pca_zero_component() {
+        let mut pca = super::Pca::new(0);
+
+        let x = Array2::<f32>::zeros((0, 5));
+        let y = pca.fit_transform(&x).unwrap();
+        assert_eq!(y.nrows(), 0);
+        assert_eq!(y.ncols(), 0);
+
+        let x = arr2(&[[0_f32, 0_f32], [3_f32, 4_f32], [6_f32, 8_f32]]);
+        let y = pca.fit_transform(&x).unwrap();
+        assert_eq!(y.nrows(), 3);
+        assert_eq!(y.ncols(), 0);
+    }
 
     #[test]
     fn pca() {
         let x = arr2(&[[0_f64, 0_f64], [3_f64, 4_f64], [6_f64, 8_f64]]);
         let mut pca = super::Pca::new(1);
         let y = pca.fit_transform(&x).unwrap();
+        assert!(approx_eq!(f64, (y[(0, 0)] - y[(2, 0)]).abs(), 10.));
+        assert!(approx_eq!(f64, y[(1, 0)], 0.));
+
+        let mut pca = super::Pca::new(1);
+        assert!(pca.fit(&x).is_ok());
+        let y = pca.transform(&x).unwrap();
         assert!(approx_eq!(f64, (y[(0, 0)] - y[(2, 0)]).abs(), 10.));
         assert!(approx_eq!(f64, y[(1, 0)], 0.));
     }
