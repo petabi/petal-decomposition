@@ -1,8 +1,8 @@
 use crate::DecompositionError;
 use itertools::izip;
-use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr};
+use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr, ScalarOperand};
 use ndarray_linalg::{Lapack, Scalar, SVD};
-use num_traits::real::Real;
+use num::traits::real::Real;
 
 /// Principal component analysis.
 ///
@@ -22,19 +22,24 @@ where
     A: Scalar,
 {
     components: Array2<A>,
+    n_samples: usize,
     means: Array1<A>,
+    singular: Array1<A::Real>,
 }
 
 impl<A> Pca<A>
 where
     A: Scalar + Lapack,
+    A::Real: ScalarOperand,
 {
-    /// Initializes `Pca` for `n_components` components.
+    /// Creates a PCA model with the given number of components.
     #[must_use]
     pub fn new(n_components: usize) -> Self {
         Pca {
             components: Array2::<A>::zeros((n_components, 0)),
+            n_samples: 0,
             means: Array1::<A>::zeros(0),
+            singular: Array1::<A::Real>::zeros(0),
         }
     }
 
@@ -42,6 +47,21 @@ where
     #[must_use]
     pub fn n_components(&self) -> usize {
         self.components.nrows()
+    }
+
+    /// Returns sigular values.
+    #[must_use]
+    pub fn singular_values(&self) -> &Array1<A::Real> {
+        &self.singular
+    }
+
+    /// Returns the ratio of explained variance for each component.
+    #[must_use]
+    pub fn explained_variance_ratio(&self) -> Array1<A::Real> {
+        let mut variance: Array1<A::Real> = &self.singular * &self.singular;
+        let total_variance = variance.sum();
+        variance /= total_variance;
+        variance
     }
 
     /// Fits the model with `input`.
@@ -91,7 +111,7 @@ where
     where
         S: Data<Elem = A>,
     {
-        let (u, sigma) = self.inner_fit(input)?;
+        let u = self.inner_fit(input)?;
         Ok(unsafe {
             let mut y: ArrayBase<OwnedRepr<A>, Ix2> =
                 ArrayBase::uninitialized((input.nrows(), self.n_components()));
@@ -100,7 +120,7 @@ where
                 .into_iter()
                 .zip(u.slice(s![.., 0..self.n_components()]).lanes(Axis(1)))
             {
-                for (y_v, u_v, sigma_v) in izip!(y_row.into_iter(), u_row, &sigma) {
+                for (y_v, u_v, sigma_v) in izip!(y_row.into_iter(), u_row, &self.singular) {
                     *y_v = *u_v * A::from_real(*sigma_v);
                 }
             }
@@ -116,10 +136,7 @@ where
     ///   is less than the number of components.
     /// * `DecompositionError::LinalgError` if the underlying Singular Vector
     ///   Decomposition routine fails.
-    fn inner_fit<S>(
-        &mut self,
-        input: &ArrayBase<S, Ix2>,
-    ) -> Result<(Array2<A>, Array1<A::Real>), DecompositionError>
+    fn inner_fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, DecompositionError>
     where
         S: Data<Elem = A>,
     {
@@ -130,10 +147,7 @@ where
         let means = if let Some(means) = input.mean_axis(Axis(0)) {
             means
         } else {
-            return Ok((
-                Array2::<A>::zeros((0, input.ncols())),
-                Array1::<A::Real>::zeros(input.ncols()),
-            ));
+            return Ok(Array2::<A>::zeros((0, input.ncols())));
         };
         let x = input - &means;
         let (u, sigma, vt) = x.svd(true, true)?;
@@ -141,9 +155,11 @@ where
         let mut vt = vt.expect("`svd` should return `vt`");
         svd_flip(&mut u, &mut vt);
         self.components = vt.slice(s![0..self.n_components(), ..]).into_owned();
+        self.n_samples = input.nrows();
         self.means = means;
+        self.singular = sigma;
 
-        Ok((u, sigma))
+        Ok(u)
     }
 }
 
@@ -207,6 +223,14 @@ mod test {
     }
 
     #[test]
+    fn pca_single_sample() {
+        let mut pca = super::Pca::new(1);
+        let x = arr2(&[[1_f32, 1_f32]]);
+        let y = pca.fit_transform(&x).unwrap();
+        assert_eq!(y, arr2(&[[0.0]]));
+    }
+
+    #[test]
     fn pca() {
         let x = arr2(&[[0_f64, 0_f64], [3_f64, 4_f64], [6_f64, 8_f64]]);
         let mut pca = super::Pca::new(1);
@@ -219,6 +243,23 @@ mod test {
         let y = pca.transform(&x).unwrap();
         assert!(approx_eq!(f64, (y[(0, 0)] - y[(2, 0)]).abs(), 10.));
         assert!(approx_eq!(f64, y[(1, 0)], 0.));
+    }
+
+    #[test]
+    fn pca_explained_variance_ratio() {
+        let x = arr2(&[
+            [-1_f64, -1_f64],
+            [-2_f64, -1_f64],
+            [-3_f64, -2_f64],
+            [1_f64, 1_f64],
+            [2_f64, 1_f64],
+            [3_f64, 2_f64],
+        ]);
+        let mut pca = super::Pca::new(2);
+        assert!(pca.fit(&x).is_ok());
+        let ratio = pca.explained_variance_ratio();
+        assert!(ratio.get(0).unwrap() > &0.99244);
+        assert!(ratio.get(1).unwrap() < &0.00756);
     }
 
     #[test]

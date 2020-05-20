@@ -19,7 +19,7 @@ codecov = { repository = "petabi/petal-decomposition", service = "github" }
 itertools = "0.9"
 ndarray = "0.13"
 ndarray-linalg = { version = "0.12", features = ["intel-mkl"] }
-num-traits = "0.2"
+num = "0.2"
 thiserror = "1"
 
 [dev-dependencies]
