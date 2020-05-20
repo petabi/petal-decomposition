@@ -6,6 +6,10 @@ use num::traits::real::Real;
 
 /// Principal component analysis.
 ///
+/// This reduces the dimensionality of the input data using Singular Value
+/// Decomposition (SVD). The data is centered for each feature before applying
+/// SVD.
+///
 /// # Examples
 ///
 /// ```
@@ -99,6 +103,12 @@ where
 
     /// Fits the model with `input` and apply the dimensionality reduction on
     /// `input`.
+    ///
+    /// This is equivalent to calling both [`fit`] and [`transform`] for the
+    /// same input.
+    ///
+    /// [`fit`]: #method.fit
+    /// [`transform`]: #method.transform
     ///
     /// # Errors
     ///
