@@ -3,6 +3,7 @@
 Principal Component Analysis.
 
 [![crates.io](https://img.shields.io/crates/v/petal-decomposition)](https://crates.io/crates/petal-decomposition)
+[![Documentation](https://docs.rs/petal-decomposition/badge.svg)](https://docs.rs/petal-decomposition)
 [![Coverage Status](https://codecov.io/gh/petabi/petal-decomposition/branch/master/graphs/badge.svg)](https://codecov.io/gh/petabi/petal-decomposition)
 
 ## Requirements

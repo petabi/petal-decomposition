@@ -1,6 +1,6 @@
 [package]
 name = "petal-decomposition"
-version = "0.1.0"
+version = "0.1.1"
 description = "Principal component analysis (PCA)."
 readme = "README.md"
 homepage = "https://github.com/petabi/petal-decomposition"
