@@ -15,10 +15,20 @@ exclude = ["./github"]
 [badges]
 codecov = { repository = "petabi/petal-decomposition", service = "github" }
 
+[package.metadata.docs.rs]
+no-default-features = true
+
+[features]
+default = ["intel-mkl"]
+
+intel-mkl = ["ndarray-linalg/intel-mkl"]
+netlib = ["ndarray-linalg/netlib"]
+openblas = ["ndarray-linalg/openblas"]
+
 [dependencies]
 itertools = "0.9"
 ndarray = "0.13"
-ndarray-linalg = { version = "0.12", features = ["intel-mkl"] }
+ndarray-linalg = "0.12"
 num = "0.2"
 thiserror = "1"
 
