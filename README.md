@@ -20,7 +20,7 @@ use ndarray::arr2;
 use petal_decomposition::Pca;
 
 let x = arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
-let pca = Pca::new(2);                   // Keep two dimensions.
+let mut pca = Pca::new(2);               // Keep two dimensions.
 pca.fit(&x).unwrap();
 
 let s = pca.singular_values();           // [2_f64, 0_f64]
