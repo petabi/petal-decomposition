@@ -1,6 +1,8 @@
 # petal-decomposition
 
-Principal Component Analysis.
+petal-decomposition provides PCA (Principal Component Analysis) with two
+different SVD (singular value decomposition) methods: exact, full SVD and
+randomized, truncated SVD.
 
 [![crates.io](https://img.shields.io/crates/v/petal-decomposition)](https://crates.io/crates/petal-decomposition)
 [![Documentation](https://docs.rs/petal-decomposition/badge.svg)](https://docs.rs/petal-decomposition)

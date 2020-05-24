@@ -1,8 +1,12 @@
+use crate::linalg::{lu_pl, Lapack};
 use crate::DecompositionError;
 use itertools::izip;
-use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr, ScalarOperand};
-use ndarray_linalg::{Lapack, Scalar, SVD};
-use num::traits::real::Real;
+use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, OwnedRepr, ScalarOperand};
+use ndarray_linalg::{error::LinalgError, QRInto, Scalar, UVTFlag, SVD, SVDDC};
+use num::{traits::real::Real, FromPrimitive};
+use rand::{Rng, RngCore};
+use rand_distr::StandardNormal;
+use std::cmp;
 
 /// Principal component analysis.
 ///
@@ -13,13 +17,14 @@ use num::traits::real::Real;
 /// # Examples
 ///
 /// ```
-/// use float_cmp::approx_eq;
 /// use ndarray::arr2;
 /// use petal_decomposition::Pca;
 ///
 /// let x = arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
 /// let y = Pca::new(1).fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
-/// assert!(approx_eq!(f64, (y[(0, 0)] - y[(2, 0)]).abs(), 2_f64.sqrt() * 2.));
+/// assert!((y[(0, 0)].abs() - 2_f64.sqrt()).abs() < 1e-8);
+/// assert!(y[(1, 0)].abs() < 1e-8);
+/// assert!((y[(2, 0)].abs() - 2_f64.sqrt()).abs() < 1e-8);
 /// ```
 pub struct Pca<A>
 where
@@ -28,6 +33,7 @@ where
     components: Array2<A>,
     n_samples: usize,
     means: Array1<A>,
+    total_variance: A::Real,
     singular: Array1<A::Real>,
 }
 
@@ -39,10 +45,11 @@ where
     /// Creates a PCA model with the given number of components.
     #[must_use]
     pub fn new(n_components: usize) -> Self {
-        Pca {
+        Self {
             components: Array2::<A>::zeros((n_components, 0)),
             n_samples: 0,
             means: Array1::<A>::zeros(0),
+            total_variance: A::zero().re(),
             singular: Array1::<A::Real>::zeros(0),
         }
     }
@@ -63,8 +70,7 @@ where
     #[must_use]
     pub fn explained_variance_ratio(&self) -> Array1<A::Real> {
         let mut variance: Array1<A::Real> = &self.singular * &self.singular;
-        let total_variance = variance.sum();
-        variance /= total_variance;
+        variance /= self.total_variance;
         variance
     }
 
@@ -164,13 +170,253 @@ where
         let mut u = u.expect("`svd` should return `u`");
         let mut vt = vt.expect("`svd` should return `vt`");
         svd_flip(&mut u, &mut vt);
+        self.total_variance = sigma.dot(&sigma);
         self.components = vt.slice(s![0..self.n_components(), ..]).into_owned();
         self.n_samples = input.nrows();
         self.means = means;
-        self.singular = sigma;
+        self.singular = sigma.slice(s![0..self.n_components()]).into_owned();
 
         Ok(u)
     }
+}
+
+/// Principal component analysis using randomized singular value decomposition.
+///
+/// This uses randomized SVD (singular value decomposition) proposed by Halko et
+/// al. [1] to reduce the dimensionality of the input data. The data is centered
+/// for each feature before applying randomized SVD.
+///
+/// # Examples
+///
+/// ```
+/// use ndarray::arr2;
+/// use petal_decomposition::RandomizedPca;
+/// use rand::thread_rng;
+///
+/// let x = arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
+/// let mut pca = RandomizedPca::new(1, thread_rng());
+/// let y = pca.fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
+/// assert!((y[(0, 0)].abs() - 2_f64.sqrt()).abs() < 1e-8);
+/// assert!(y[(1, 0)].abs() < 1e-8);
+/// assert!((y[(2, 0)].abs() - 2_f64.sqrt()).abs() < 1e-8);
+/// ```
+///
+/// # References
+///
+/// 1. N. Halko, P. G. Martinsson, and J. A. Tropp. Finding Structure with
+///    Randomness: Probabilistic Algorithms for Constructing Approximate Matrix
+///    Decompositions. _SIAM Review,_ 53(2), 217–288, 2011.
+#[allow(clippy::module_name_repetitions)]
+pub struct RandomizedPca<A, R>
+where
+    A: Scalar,
+    R: Rng,
+{
+    rng: R,
+    components: Array2<A>,
+    n_samples: usize,
+    means: Array1<A>,
+    total_variance: A::Real,
+    singular: Array1<A::Real>,
+}
+
+impl<A, R> RandomizedPca<A, R>
+where
+    A: Scalar + Lapack,
+    A::Real: ScalarOperand,
+    R: Rng,
+{
+    /// Creates a PCA model with the given number of components. The random
+    /// number generator `rng` is used to generate a random matrix for
+    /// randomized SVD.
+    #[must_use]
+    pub fn new(n_components: usize, rng: R) -> Self {
+        Self {
+            rng,
+            components: Array2::<A>::zeros((n_components, 0)),
+            n_samples: 0,
+            means: Array1::<A>::zeros(0),
+            total_variance: A::zero().re(),
+            singular: Array1::<A::Real>::zeros(0),
+        }
+    }
+
+    /// Returns the number of components.
+    #[must_use]
+    pub fn n_components(&self) -> usize {
+        self.components.nrows()
+    }
+
+    /// Returns sigular values.
+    #[must_use]
+    pub fn singular_values(&self) -> &Array1<A::Real> {
+        &self.singular
+    }
+
+    /// Returns the ratio of explained variance for each component.
+    #[must_use]
+    pub fn explained_variance_ratio(&self) -> Array1<A::Real> {
+        let mut variance: Array1<A::Real> = &self.singular * &self.singular;
+        variance /= self.total_variance;
+        variance
+    }
+
+    /// Fits the model with `input`.
+    ///
+    /// # Errors
+    ///
+    /// * `DecompositionError::InvalidInput` if any of the dimensions of `input`
+    ///   is less than the number of components.
+    /// * `DecompositionError::LinalgError` if the underlying Singular Vector
+    ///   Decomposition routine fails.
+    pub fn fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<(), DecompositionError>
+    where
+        S: Data<Elem = A>,
+    {
+        self.inner_fit(input)?;
+        Ok(())
+    }
+
+    /// Applies dimensionality reduction to `input`.
+    ///
+    /// # Errors
+    ///
+    /// * `DecompositionError::InvalidInput` if the number of features in
+    ///   `input` does not match that of the training data.
+    pub fn transform<S>(&self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, DecompositionError>
+    where
+        S: Data<Elem = A>,
+    {
+        if input.ncols() != self.means.len() {
+            return Err(DecompositionError::InvalidInput);
+        }
+        let x = input - &self.means;
+        Ok(x.dot(&self.components.t()))
+    }
+
+    /// Fits the model with `input` and apply the dimensionality reduction on
+    /// `input`.
+    ///
+    /// This is equivalent to calling both [`fit`] and [`transform`] for the
+    /// same input.
+    ///
+    /// [`fit`]: #method.fit
+    /// [`transform`]: #method.transform
+    ///
+    /// # Errors
+    ///
+    /// Returns `DecompositionError::LinalgError` if the underlying Singular
+    /// Vector Decomposition routine fails.
+    pub fn fit_transform<S>(
+        &mut self,
+        input: &ArrayBase<S, Ix2>,
+    ) -> Result<Array2<A>, DecompositionError>
+    where
+        S: Data<Elem = A>,
+    {
+        let u = self.inner_fit(input)?;
+        Ok(unsafe {
+            let mut y: ArrayBase<OwnedRepr<A>, Ix2> =
+                ArrayBase::uninitialized((input.nrows(), self.n_components()));
+            for (y_row, u_row) in y
+                .lanes_mut(Axis(1))
+                .into_iter()
+                .zip(u.slice(s![.., 0..self.n_components()]).lanes(Axis(1)))
+            {
+                for (y_v, u_v, sigma_v) in izip!(y_row.into_iter(), u_row, &self.singular) {
+                    *y_v = *u_v * A::from_real(*sigma_v);
+                }
+            }
+            y
+        })
+    }
+
+    /// Fits the model with `input`.
+    ///
+    /// # Errors
+    ///
+    /// * `DecompositionError::InvalidInput` if any of the dimensions of `input`
+    ///   is less than the number of components.
+    /// * `DecompositionError::LinalgError` if the underlying Singular Vector
+    ///   Decomposition routine fails.
+    fn inner_fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, DecompositionError>
+    where
+        S: Data<Elem = A>,
+    {
+        if input.shape().iter().any(|v| *v < self.n_components()) {
+            return Err(DecompositionError::InvalidInput);
+        }
+
+        let means = if let Some(means) = input.mean_axis(Axis(0)) {
+            means
+        } else {
+            return Ok(Array2::<A>::zeros((0, input.ncols())));
+        };
+        let x = input - &means;
+        let (u, sigma, vt) = randomized_svd(&x, self.n_components(), &mut self.rng)?;
+        self.total_variance = x.iter().fold(A::zero().re(), |var, &e| var + e.square());
+        self.components = vt.slice(s![0..self.n_components(), ..]).into_owned();
+        self.n_samples = input.nrows();
+        self.means = means;
+        self.singular = sigma.slice(s![0..self.n_components()]).into_owned();
+
+        Ok(u)
+    }
+}
+
+type Svd<A> = (Array2<A>, Array1<<A as Scalar>::Real>, Array2<A>);
+
+/// Computes a truncated randomized SVD
+fn randomized_svd<A, S, R>(
+    input: &ArrayBase<S, Ix2>,
+    n_components: usize,
+    rng: &mut R,
+) -> Result<Svd<A>, LinalgError>
+where
+    A: Scalar + Lapack,
+    S: DataMut<Elem = A>,
+    R: RngCore,
+{
+    let n_random = n_components + 10; // oversample by 10
+    let q = randomized_range_finder(input, n_random, 7, rng)?;
+    let b = q.t().dot(input);
+    let (u, sigma, vt) = b.svddc(UVTFlag::Some)?;
+    let u = u.expect("`svddc` should return `u`");
+    let mut vt = vt.expect("`svddc` should return `vt`");
+    let mut u = q.dot(&u);
+    svd_flip(&mut u, &mut vt);
+    Ok((u, sigma, vt))
+}
+
+/// Computes an orthonormal matrix whose range approximates the range of `input`.
+fn randomized_range_finder<A, S, R>(
+    input: &ArrayBase<S, Ix2>,
+    size: usize,
+    n_iter: usize,
+    rng: &mut R,
+) -> Result<Array2<A>, LinalgError>
+where
+    A: Scalar + Lapack,
+    S: Data<Elem = A>,
+    R: RngCore,
+{
+    let mut q = ArrayBase::from_shape_fn((input.ncols(), size), |_| {
+        let r = A::Real::from_f64(rng.sample(StandardNormal))
+            .expect("float to float conversion never fails");
+        A::from_real(r)
+    });
+    let mut pl = q.view();
+    q = input.dot(&pl);
+    for _ in 0..n_iter {
+        lu_pl(&mut q)?;
+        pl = q.slice(s![.., 0..cmp::min(q.nrows(), q.ncols())]);
+        q = input.t().dot(&pl);
+        lu_pl(&mut q)?;
+        pl = q.slice(s![.., 0..cmp::min(q.nrows(), q.ncols())]);
+        q = input.dot(&pl);
+    }
+    let (q, _) = q.qr_into()?;
+    Ok(q)
 }
 
 /// Makes `SVD`'s output deterministic using the columns of `u` as the basis for
@@ -214,8 +460,16 @@ where
 
 #[cfg(test)]
 mod test {
-    use float_cmp::approx_eq;
+    use approx::{assert_abs_diff_eq, assert_relative_eq};
     use ndarray::{arr2, Array2};
+    use rand::{Rng, SeedableRng};
+    use rand_chacha::ChaChaRng;
+    use rand_distr::StandardNormal;
+
+    const ZERO_SEED: [u8; 32] = [
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0,
+    ];
 
     #[test]
     fn pca_zero_component() {
@@ -244,15 +498,20 @@ mod test {
     fn pca() {
         let x = arr2(&[[0_f64, 0_f64], [3_f64, 4_f64], [6_f64, 8_f64]]);
         let mut pca = super::Pca::new(1);
+        assert_eq!(pca.n_components(), 1);
+
         let y = pca.fit_transform(&x).unwrap();
-        assert!(approx_eq!(f64, (y[(0, 0)] - y[(2, 0)]).abs(), 10.));
-        assert!(approx_eq!(f64, y[(1, 0)], 0.));
+        assert_abs_diff_eq!(y[(0, 0)].abs(), 5., epsilon = 1e-10);
+        assert_abs_diff_eq!(y[(1, 0)], 0., epsilon = 1e-10);
+        assert_abs_diff_eq!(y[(2, 0)].abs(), 5., epsilon = 1e-10);
 
         let mut pca = super::Pca::new(1);
         assert!(pca.fit(&x).is_ok());
+        assert_eq!(pca.n_components(), 1);
         let y = pca.transform(&x).unwrap();
-        assert!(approx_eq!(f64, (y[(0, 0)] - y[(2, 0)]).abs(), 10.));
-        assert!(approx_eq!(f64, y[(1, 0)], 0.));
+        assert_abs_diff_eq!(y[(0, 0)].abs(), 5., epsilon = 1e-10);
+        assert_abs_diff_eq!(y[(1, 0)], 0., epsilon = 1e-10);
+        assert_abs_diff_eq!(y[(2, 0)].abs(), 5., epsilon = 1e-10);
     }
 
     #[test]
@@ -270,6 +529,85 @@ mod test {
         let ratio = pca.explained_variance_ratio();
         assert!(ratio.get(0).unwrap() > &0.99244);
         assert!(ratio.get(1).unwrap() < &0.00756);
+    }
+
+    #[test]
+    fn pca_randomized() {
+        let x = arr2(&[[0_f64, 0_f64], [3_f64, 4_f64], [6_f64, 8_f64]]);
+        let mut rng = ChaChaRng::from_seed(ZERO_SEED);
+        let mut pca = super::RandomizedPca::new(1, &mut rng);
+        assert_eq!(pca.n_components(), 1);
+
+        let res = pca.fit(&x);
+        assert!(res.is_ok());
+        assert_eq!(pca.n_components(), 1);
+        let y = pca.transform(&x).unwrap();
+        assert_abs_diff_eq!(y[(0, 0)].abs(), 5., epsilon = 1e-10);
+        assert_abs_diff_eq!(y[(1, 0)], 0., epsilon = 1e-10);
+        assert_abs_diff_eq!(y[(2, 0)].abs(), 5., epsilon = 1e-10);
+
+        let mut pca = super::RandomizedPca::new(1, rand::thread_rng());
+        let y = pca.fit_transform(&x).unwrap();
+        assert_abs_diff_eq!(y[(0, 0)].abs(), 5., epsilon = 1e-10);
+        assert_abs_diff_eq!(y[(1, 0)], 0., epsilon = 1e-10);
+        assert_abs_diff_eq!(y[(2, 0)].abs(), 5., epsilon = 1e-10);
+    }
+
+    #[test]
+    fn pca_randomized_explained_variance_ratio() {
+        let x = arr2(&[
+            [-1_f64, -1_f64],
+            [-2_f64, -1_f64],
+            [-3_f64, -2_f64],
+            [1_f64, 1_f64],
+            [2_f64, 1_f64],
+            [3_f64, 2_f64],
+        ]);
+        let mut pca = super::RandomizedPca::new(2, rand::thread_rng());
+        assert!(pca.fit(&x).is_ok());
+        let ratio = pca.explained_variance_ratio();
+        assert!(ratio.get(0).unwrap() > &0.99244);
+        assert!(ratio.get(1).unwrap() < &0.00756);
+    }
+
+    #[test]
+    fn pca_randomized_explained_variance_equivalence() {
+        let mut rng = ChaChaRng::from_seed(ZERO_SEED);
+        let x = Array2::from_shape_fn((100, 80), |_| rng.sample::<f64, _>(StandardNormal));
+
+        let mut pca = super::Pca::new(2);
+        let mut pca_rand = super::RandomizedPca::new(2, rng);
+
+        assert!(pca.fit(&x).is_ok());
+        assert!(pca_rand.fit(&x).is_ok());
+
+        for (a, b) in pca
+            .explained_variance_ratio()
+            .iter()
+            .zip(pca_rand.explained_variance_ratio().iter())
+        {
+            assert_relative_eq!(a, b, max_relative = 0.05);
+        }
+    }
+
+    #[test]
+    fn pca_randomized_singular_values_consistency() {
+        let mut rng = ChaChaRng::from_seed(ZERO_SEED);
+        let x = Array2::from_shape_fn((100, 80), |_| rng.sample::<f64, _>(StandardNormal));
+
+        let mut pca = super::Pca::new(2);
+        let mut pca_rand = super::RandomizedPca::new(2, rng);
+
+        assert!(pca.fit(&x).is_ok());
+        assert!(pca_rand.fit(&x).is_ok());
+
+        for (a, b) in pca
+            .singular_values()
+            .iter()
+            .zip(pca_rand.singular_values().iter())
+        {
+            assert_relative_eq!(a, b, max_relative = 0.02);
+        }
     }
 
     #[test]

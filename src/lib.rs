@@ -1,7 +1,8 @@
+mod linalg;
 mod pca;
 
 use ndarray_linalg::error::LinalgError;
-pub use pca::Pca;
+pub use pca::{Pca, RandomizedPca};
 use thiserror::Error;
 
 /// The error type for PCA operations.
