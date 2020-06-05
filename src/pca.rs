@@ -3,7 +3,7 @@ use crate::DecompositionError;
 use itertools::izip;
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, OwnedRepr, ScalarOperand};
 use ndarray_linalg::{error::LinalgError, QRInto, Scalar, UVTFlag, SVD, SVDDC};
-use num::{traits::real::Real, FromPrimitive};
+use num_traits::{real::Real, FromPrimitive};
 use rand::{Rng, RngCore};
 use rand_distr::StandardNormal;
 use std::cmp;
@@ -17,10 +17,9 @@ use std::cmp;
 /// # Examples
 ///
 /// ```
-/// use ndarray::arr2;
 /// use petal_decomposition::Pca;
 ///
-/// let x = arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
+/// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
 /// let y = Pca::new(1).fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
 /// assert!((y[(0, 0)].abs() - 2_f64.sqrt()).abs() < 1e-8);
 /// assert!(y[(1, 0)].abs() < 1e-8);
@@ -111,7 +110,7 @@ where
     /// `input`.
     ///
     /// This is equivalent to calling both [`fit`] and [`transform`] for the
-    /// same input.
+    /// same input, but more efficient.
     ///
     /// [`fit`]: #method.fit
     /// [`transform`]: #method.transform
@@ -189,12 +188,10 @@ where
 /// # Examples
 ///
 /// ```
-/// use ndarray::arr2;
 /// use petal_decomposition::RandomizedPca;
-/// use rand::thread_rng;
 ///
-/// let x = arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
-/// let mut pca = RandomizedPca::new(1, thread_rng());
+/// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
+/// let mut pca = RandomizedPca::new(1, rand::thread_rng());
 /// let y = pca.fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
 /// assert!((y[(0, 0)].abs() - 2_f64.sqrt()).abs() < 1e-8);
 /// assert!(y[(1, 0)].abs() < 1e-8);

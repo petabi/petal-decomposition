@@ -1,6 +1,8 @@
+mod ica;
 mod linalg;
 mod pca;
 
+pub use ica::FastIca;
 use ndarray_linalg::error::LinalgError;
 pub use pca::{Pca, RandomizedPca};
 use thiserror::Error;

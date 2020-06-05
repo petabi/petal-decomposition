@@ -1,8 +1,7 @@
 # petal-decomposition
 
-petal-decomposition provides PCA (Principal Component Analysis) with two
-different SVD (singular value decomposition) methods: exact, full SVD and
-randomized, truncated SVD.
+petal-decomposition provides matrix decomposition algorithms including PCA
+(Principal Component Analysis) and ICA (independent component analysis).
 
 [![crates.io](https://img.shields.io/crates/v/petal-decomposition)](https://crates.io/crates/petal-decomposition)
 [![Documentation](https://docs.rs/petal-decomposition/badge.svg)](https://docs.rs/petal-decomposition)
@@ -11,6 +10,13 @@ randomized, truncated SVD.
 ## Requirements
 
 * Rust ≥ 1.38
+* BLAS/LAPACK backend (OpenBLAS, Netlib, or Intel MKL)
+
+## Features
+
+* PCA with exact, full SVD (singular value decomposition)
+* PCA with randomized, truncated SVD
+* [FastICA](https://www.cs.helsinki.fi/u/ahyvarin/papers/NN00new.pdf)
 
 ## Examples
 
