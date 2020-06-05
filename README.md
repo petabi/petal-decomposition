@@ -1,7 +1,7 @@
 # petal-decomposition
 
 petal-decomposition provides matrix decomposition algorithms including PCA
-(Principal Component Analysis) and ICA (independent component analysis).
+(principal component analysis) and ICA (independent component analysis).
 
 [![crates.io](https://img.shields.io/crates/v/petal-decomposition)](https://crates.io/crates/petal-decomposition)
 [![Documentation](https://docs.rs/petal-decomposition/badge.svg)](https://docs.rs/petal-decomposition)
