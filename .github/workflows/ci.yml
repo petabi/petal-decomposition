@@ -33,9 +33,16 @@ jobs:
       uses: codecov/codecov-action@master
       with:
         token: ${{secrets.CODECOV_TOKEN}}
+
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Rust
+      uses: hecrj/setup-rust-action@v1
+      with:
+        rust-version: stable
+    - uses: actions/checkout@master
     - name: Check formatting
-      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       run: cargo fmt -- --check
     - name: Clippy
-      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       run: cargo clippy -- -D warnings -W clippy::pedantic
