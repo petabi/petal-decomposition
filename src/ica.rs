@@ -4,6 +4,8 @@ use ndarray_linalg::{Eigh, Lapack, Scalar, SVD, UPLO};
 use num_traits::FromPrimitive;
 use rand::Rng;
 use rand_distr::StandardNormal;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::cmp;
 use std::iter::FromIterator;
 
@@ -20,6 +22,13 @@ use std::iter::FromIterator;
 /// let mut ica = FastIca::new(rand::thread_rng());
 /// let y = ica.fit_transform(&x).unwrap();
 /// ```
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(
+        bound = "A: Serialize, for<'a> A: Deserialize<'a>, R: Serialize, for<'a> R: Deserialize<'a>"
+    )
+)]
 #[allow(clippy::module_name_repetitions)]
 pub struct FastIca<A, R>
 where
@@ -250,28 +259,38 @@ mod test {
     use approx::{assert_abs_diff_eq, assert_relative_eq};
     use ndarray::arr2;
     use rand::SeedableRng;
-    use rand_chacha::ChaChaRng;
+    use rand_pcg::Pcg32;
 
-    const ZERO_SEED: [u8; 32] = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0,
-    ];
+    const RNG_SEED: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
     #[test]
     fn fast_ica_fit_transform() {
-        let rng = ChaChaRng::from_seed(ZERO_SEED);
+        let rng = Pcg32::from_seed(RNG_SEED);
         let x = arr2(&[[0., 0.], [1., 1.], [1., -1.]]);
         let mut ica = super::FastIca::new(rng);
         assert!(ica.fit(&x).is_ok());
         assert_eq!(ica.n_iter, 1);
         let result_fit = ica.transform(&x).unwrap();
 
-        let rng = ChaChaRng::from_seed(ZERO_SEED);
+        let rng = Pcg32::from_seed(RNG_SEED);
         let mut ica = super::FastIca::new(rng);
         let result_fit_transform = ica.fit_transform(&x).unwrap();
         assert_eq!(ica.n_iter, 1);
 
         assert_eq!(result_fit, result_fit_transform);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn fast_ica_serialize() {
+        let rng = Pcg32::from_seed(RNG_SEED);
+        let x = arr2(&[[0., 0.], [1., 1.], [1., -1.]]);
+        let mut ica = super::FastIca::new(rng);
+        assert!(ica.fit(&x).is_ok());
+        let serialized = serde_json::to_string(&ica).unwrap();
+        let deserialized: super::FastIca<f64, Pcg32> = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.components, ica.components);
+        assert_eq!(deserialized.means, ica.means);
     }
 
     #[test]

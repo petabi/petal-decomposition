@@ -17,6 +17,7 @@ petal-decomposition provides matrix decomposition algorithms including PCA
 * PCA with exact, full SVD (singular value decomposition)
 * PCA with randomized, truncated SVD
 * [FastICA](https://www.cs.helsinki.fi/u/ahyvarin/papers/NN00new.pdf)
+* Serialization/deserialization (requires the `serde` feature)
 
 ## Examples
 

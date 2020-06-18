@@ -6,6 +6,8 @@ use ndarray_linalg::{error::LinalgError, QRInto, Scalar, UVTFlag, SVD, SVDDC};
 use num_traits::{real::Real, FromPrimitive};
 use rand::{Rng, RngCore};
 use rand_distr::StandardNormal;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::cmp;
 
 /// Principal component analysis.
@@ -25,6 +27,11 @@ use std::cmp;
 /// assert!(y[(1, 0)].abs() < 1e-8);
 /// assert!((y[(2, 0)].abs() - 2_f64.sqrt()).abs() < 1e-8);
 /// ```
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(bound = "A: Serialize, for<'a> A: Deserialize<'a>")
+)]
 pub struct Pca<A>
 where
     A: Scalar,
@@ -203,6 +210,13 @@ where
 /// 1. N. Halko, P. G. Martinsson, and J. A. Tropp. Finding Structure with
 ///    Randomness: Probabilistic Algorithms for Constructing Approximate Matrix
 ///    Decompositions. _SIAM Review,_ 53(2), 217–288, 2011.
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(
+        bound = "A: Serialize, for<'a> A: Deserialize<'a>, R: Serialize, for<'a> R: Deserialize<'a>"
+    )
+)]
 #[allow(clippy::module_name_repetitions)]
 pub struct RandomizedPca<A, R>
 where
@@ -460,13 +474,10 @@ mod test {
     use approx::{assert_abs_diff_eq, assert_relative_eq};
     use ndarray::{arr2, Array2};
     use rand::{Rng, SeedableRng};
-    use rand_chacha::ChaChaRng;
     use rand_distr::StandardNormal;
+    use rand_pcg::Pcg32;
 
-    const ZERO_SEED: [u8; 32] = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0,
-    ];
+    const RNG_SEED: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
     #[test]
     fn pca_zero_component() {
@@ -529,9 +540,21 @@ mod test {
     }
 
     #[test]
-    fn pca_randomized() {
+    #[cfg(feature = "serde")]
+    fn pca_serialize() {
+        let mut pca = super::Pca::new(1);
+        let x = arr2(&[[1_f32, 1_f32]]);
+        assert!(pca.fit(&x).is_ok());
+        let serialized = serde_json::to_string(&pca).unwrap();
+        let deserialized: super::Pca<f32> = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.components, pca.components);
+        assert_eq!(deserialized.means, pca.means);
+    }
+
+    #[test]
+    fn randomized_pca() {
         let x = arr2(&[[0_f64, 0_f64], [3_f64, 4_f64], [6_f64, 8_f64]]);
-        let mut rng = ChaChaRng::from_seed(ZERO_SEED);
+        let mut rng = Pcg32::from_seed(RNG_SEED);
         let mut pca = super::RandomizedPca::new(1, &mut rng);
         assert_eq!(pca.n_components(), 1);
 
@@ -551,7 +574,7 @@ mod test {
     }
 
     #[test]
-    fn pca_randomized_explained_variance_ratio() {
+    fn randomized_pca_explained_variance_ratio() {
         let x = arr2(&[
             [-1_f64, -1_f64],
             [-2_f64, -1_f64],
@@ -568,8 +591,8 @@ mod test {
     }
 
     #[test]
-    fn pca_randomized_explained_variance_equivalence() {
-        let mut rng = ChaChaRng::from_seed(ZERO_SEED);
+    fn randomized_pca_explained_variance_equivalence() {
+        let mut rng = Pcg32::from_seed(RNG_SEED);
         let x = Array2::from_shape_fn((100, 80), |_| rng.sample::<f64, _>(StandardNormal));
 
         let mut pca = super::Pca::new(2);
@@ -588,8 +611,8 @@ mod test {
     }
 
     #[test]
-    fn pca_randomized_singular_values_consistency() {
-        let mut rng = ChaChaRng::from_seed(ZERO_SEED);
+    fn randomized_pca_singular_values_consistency() {
+        let mut rng = Pcg32::from_seed(RNG_SEED);
         let x = Array2::from_shape_fn((100, 80), |_| rng.sample::<f64, _>(StandardNormal));
 
         let mut pca = super::Pca::new(2);
@@ -605,6 +628,19 @@ mod test {
         {
             assert_relative_eq!(a, b, max_relative = 0.02);
         }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn randomized_pca_serialize() {
+        let rng = Pcg32::from_seed(RNG_SEED);
+        let mut pca = super::RandomizedPca::new(1, rng);
+        let x = arr2(&[[1_f32, 1_f32]]);
+        assert!(pca.fit(&x).is_ok());
+        let serialized = serde_json::to_string(&pca).unwrap();
+        let deserialized: super::Pca<f32> = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.components, pca.components);
+        assert_eq!(deserialized.means, pca.means);
     }
 
     #[test]

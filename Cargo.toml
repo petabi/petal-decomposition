@@ -28,6 +28,8 @@ intel-mkl = ["ndarray-linalg/intel-mkl"]
 netlib = ["ndarray-linalg/netlib"]
 openblas = ["ndarray-linalg/openblas"]
 
+serialization = ["serde", "ndarray/serde", "rand/serde1", "rand_pcg/serde1"]
+
 [dependencies]
 itertools = "0.9"
 lapacke = "0.2"
@@ -36,8 +38,10 @@ ndarray-linalg = "0.12"
 num-traits = "0.2"
 rand = "0.7"
 rand_distr = "0.2"
+serde = { version = "1", features = ["derive"], optional = true }
 thiserror = "1"
 
 [dev-dependencies]
 approx = "0.3"
-rand_chacha = "0.2"
+rand_pcg = "0.2"
+serde_json = "1"
