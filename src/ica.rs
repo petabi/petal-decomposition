@@ -2,8 +2,12 @@ use crate::DecompositionError;
 use ndarray::{Array, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2};
 use ndarray_linalg::{Eigh, Lapack, Scalar, SVD, UPLO};
 use num_traits::FromPrimitive;
-use rand::Rng;
+use rand::{Rng, SeedableRng};
 use rand_distr::StandardNormal;
+#[cfg(target_pointer_width = "32")]
+use rand_pcg::Lcg64Xsh32 as Pcg;
+#[cfg(not(target_pointer_width = "32"))]
+use rand_pcg::Mcg128Xsl64 as Pcg;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::cmp;
@@ -19,7 +23,7 @@ use std::iter::FromIterator;
 /// use petal_decomposition::FastIca;
 ///
 /// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [1_f64, -1_f64]]);
-/// let mut ica = FastIca::new(rand::thread_rng());
+/// let mut ica = FastIca::new();
 /// let y = ica.fit_transform(&x).unwrap();
 /// ```
 #[cfg_attr(
@@ -30,7 +34,7 @@ use std::iter::FromIterator;
     )
 )]
 #[allow(clippy::module_name_repetitions)]
-pub struct FastIca<A, R>
+pub struct FastIca<A, R = Pcg>
 where
     A: Scalar,
     R: Rng,
@@ -41,14 +45,43 @@ where
     n_iter: usize,
 }
 
+impl<A> FastIca<A, Pcg>
+where
+    A: Scalar + Lapack,
+{
+    /// Creates an ICA model with a random seed.
+    ///
+    /// It uses a PCG random number generator (the XSL 128/64 (MCG) variant on a
+    /// 64-bit CPU and the XSH RR 64/32 (LCG) variant on a 32-bit CPU),
+    /// initialized with a randomly-generated seed.
+    #[must_use]
+    pub fn new() -> Self {
+        let seed: u128 = rand::thread_rng().gen();
+        Self::with_seed(seed)
+    }
+
+    /// Creates an ICA model with the given seed for random number generation.
+    ///
+    /// It uses a PCG random number generator (the XSL 128/64 (MCG) variant on a
+    /// 64-bit CPU and the XSH RR 64/32 (LCG) variant on a 32-bit CPU). Use
+    /// [`with_rng`] for a different random number generator.
+    ///
+    /// [`with_rng`]: #method.with_rng
+    #[must_use]
+    pub fn with_seed(seed: u128) -> Self {
+        let rng = Pcg::from_seed(seed.to_be_bytes());
+        Self::with_rng(rng)
+    }
+}
+
 impl<A, R> FastIca<A, R>
 where
     A: Scalar + Lapack,
     R: Rng,
 {
-    /// Creates an ICA model.
+    /// Creates an ICA model with the given random number generator.
     #[must_use]
-    pub fn new(rng: R) -> Self {
+    pub fn with_rng(rng: R) -> Self {
         Self {
             rng,
             components: Array2::<A>::zeros((0, 0)),
@@ -173,6 +206,15 @@ where
     }
 }
 
+impl<A> Default for FastIca<A, Pcg>
+where
+    A: Scalar + Lapack,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn ica_par<A, S>(
     input: &ArrayBase<S, Ix2>,
     tol: A::Real,
@@ -258,22 +300,18 @@ where
 mod test {
     use approx::{assert_abs_diff_eq, assert_relative_eq};
     use ndarray::arr2;
-    use rand::SeedableRng;
-    use rand_pcg::Pcg32;
 
-    const RNG_SEED: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    const RNG_SEED: u128 = 1234567891011121314;
 
     #[test]
     fn fast_ica_fit_transform() {
-        let rng = Pcg32::from_seed(RNG_SEED);
         let x = arr2(&[[0., 0.], [1., 1.], [1., -1.]]);
-        let mut ica = super::FastIca::new(rng);
+        let mut ica = super::FastIca::with_seed(RNG_SEED);
         assert!(ica.fit(&x).is_ok());
         assert_eq!(ica.n_iter, 1);
         let result_fit = ica.transform(&x).unwrap();
 
-        let rng = Pcg32::from_seed(RNG_SEED);
-        let mut ica = super::FastIca::new(rng);
+        let mut ica = super::FastIca::with_seed(RNG_SEED);
         let result_fit_transform = ica.fit_transform(&x).unwrap();
         assert_eq!(ica.n_iter, 1);
 
@@ -284,12 +322,11 @@ mod test {
     #[cfg(feature = "serde")]
     fn fast_ica_serialize() {
         use approx::AbsDiffEq;
-        let rng = Pcg32::from_seed(RNG_SEED);
         let x = arr2(&[[0., 0.], [1., 1.], [1., -1.]]);
-        let mut ica = super::FastIca::new(rng);
+        let mut ica = super::FastIca::new();
         assert!(ica.fit(&x).is_ok());
         let serialized = serde_json::to_string(&ica).unwrap();
-        let deserialized: super::FastIca<f64, Pcg32> = serde_json::from_str(&serialized).unwrap();
+        let deserialized: super::FastIca<f64> = serde_json::from_str(&serialized).unwrap();
         assert!(deserialized.components.abs_diff_eq(&ica.components, 1e-12));
         assert!(deserialized.means.abs_diff_eq(&ica.means, 1e12));
     }

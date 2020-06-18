@@ -4,8 +4,12 @@ use itertools::izip;
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, OwnedRepr, ScalarOperand};
 use ndarray_linalg::{error::LinalgError, QRInto, Scalar, UVTFlag, SVD, SVDDC};
 use num_traits::{real::Real, FromPrimitive};
-use rand::{Rng, RngCore};
+use rand::{Rng, RngCore, SeedableRng};
 use rand_distr::StandardNormal;
+#[cfg(target_pointer_width = "32")]
+use rand_pcg::Lcg64Xsh32 as Pcg;
+#[cfg(not(target_pointer_width = "32"))]
+use rand_pcg::Mcg128Xsl64 as Pcg;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::cmp;
@@ -198,7 +202,7 @@ where
 /// use petal_decomposition::RandomizedPca;
 ///
 /// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
-/// let mut pca = RandomizedPca::new(1, rand::thread_rng());
+/// let mut pca = RandomizedPca::new(1);
 /// let y = pca.fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
 /// assert!((y[(0, 0)].abs() - 2_f64.sqrt()).abs() < 1e-8);
 /// assert!(y[(1, 0)].abs() < 1e-8);
@@ -231,17 +235,49 @@ where
     singular: Array1<A::Real>,
 }
 
+impl<A> RandomizedPca<A, Pcg>
+where
+    A: Scalar + Lapack,
+    A::Real: ScalarOperand,
+{
+    /// Creates a PCA model based on randomized SVD.
+    ///
+    /// The random matrix for randomized SVD is created from a PCG random number
+    /// generator (the XSL 128/64 (MCG) variant on a 64-bit CPU and the XSH RR
+    /// 64/32 (LCG) variant on a 32-bit CPU), initialized with a
+    /// randomly-generated seed.
+    #[must_use]
+    pub fn new(n_components: usize) -> Self {
+        let seed: u128 = rand::thread_rng().gen();
+        Self::with_seed(n_components, seed)
+    }
+
+    /// Creates a PCA model based on randomized SVD, with a PCG random number
+    /// generator initialized with the given seed.
+    ///
+    /// It uses a PCG random number generator (the XSL 128/64 (MCG) variant on a
+    /// 64-bit CPU and the XSH RR 64/32 (LCG) variant on a 32-bit CPU). Use
+    /// [`with_rng`] for a different random number generator.
+    ///
+    /// [`with_rng`]: #method.with_rng
+    #[must_use]
+    pub fn with_seed(n_components: usize, seed: u128) -> Self {
+        let rng = Pcg::from_seed(seed.to_be_bytes());
+        Self::with_rng(n_components, rng)
+    }
+}
+
 impl<A, R> RandomizedPca<A, R>
 where
     A: Scalar + Lapack,
     A::Real: ScalarOperand,
     R: Rng,
 {
-    /// Creates a PCA model with the given number of components. The random
-    /// number generator `rng` is used to generate a random matrix for
-    /// randomized SVD.
+    /// Creates a PCA model with the given number of components and random
+    /// number generator. The random number generator is used to create a random
+    /// matrix for randomized SVD.
     #[must_use]
-    pub fn new(n_components: usize, rng: R) -> Self {
+    pub fn with_rng(n_components: usize, rng: R) -> Self {
         Self {
             rng,
             components: Array2::<A>::zeros((n_components, 0)),
@@ -473,11 +509,11 @@ where
 mod test {
     use approx::{assert_abs_diff_eq, assert_relative_eq};
     use ndarray::{arr2, Array2};
-    use rand::{Rng, SeedableRng};
+    use rand::Rng;
     use rand_distr::StandardNormal;
-    use rand_pcg::Pcg32;
+    use rand_pcg::Pcg64Mcg;
 
-    const RNG_SEED: [u8; 16] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    const RNG_SEED: u128 = 1234567891011121314;
 
     #[test]
     fn pca_zero_component() {
@@ -555,8 +591,7 @@ mod test {
     #[test]
     fn randomized_pca() {
         let x = arr2(&[[0_f64, 0_f64], [3_f64, 4_f64], [6_f64, 8_f64]]);
-        let mut rng = Pcg32::from_seed(RNG_SEED);
-        let mut pca = super::RandomizedPca::new(1, &mut rng);
+        let mut pca = super::RandomizedPca::with_seed(1, RNG_SEED);
         assert_eq!(pca.n_components(), 1);
 
         let res = pca.fit(&x);
@@ -567,7 +602,7 @@ mod test {
         assert_abs_diff_eq!(y[(1, 0)], 0., epsilon = 1e-10);
         assert_abs_diff_eq!(y[(2, 0)].abs(), 5., epsilon = 1e-10);
 
-        let mut pca = super::RandomizedPca::new(1, rand::thread_rng());
+        let mut pca = super::RandomizedPca::with_rng(1, rand::thread_rng());
         let y = pca.fit_transform(&x).unwrap();
         assert_abs_diff_eq!(y[(0, 0)].abs(), 5., epsilon = 1e-10);
         assert_abs_diff_eq!(y[(1, 0)], 0., epsilon = 1e-10);
@@ -584,7 +619,7 @@ mod test {
             [2_f64, 1_f64],
             [3_f64, 2_f64],
         ]);
-        let mut pca = super::RandomizedPca::new(2, rand::thread_rng());
+        let mut pca = super::RandomizedPca::with_rng(2, rand::thread_rng());
         assert!(pca.fit(&x).is_ok());
         let ratio = pca.explained_variance_ratio();
         assert!(ratio.get(0).unwrap() > &0.99244);
@@ -593,11 +628,11 @@ mod test {
 
     #[test]
     fn randomized_pca_explained_variance_equivalence() {
-        let mut rng = Pcg32::from_seed(RNG_SEED);
+        let mut rng = Pcg64Mcg::new(RNG_SEED);
         let x = Array2::from_shape_fn((100, 80), |_| rng.sample::<f64, _>(StandardNormal));
 
         let mut pca = super::Pca::new(2);
-        let mut pca_rand = super::RandomizedPca::new(2, rng);
+        let mut pca_rand = super::RandomizedPca::with_rng(2, rng);
 
         assert!(pca.fit(&x).is_ok());
         assert!(pca_rand.fit(&x).is_ok());
@@ -613,11 +648,11 @@ mod test {
 
     #[test]
     fn randomized_pca_singular_values_consistency() {
-        let mut rng = Pcg32::from_seed(RNG_SEED);
+        let mut rng = Pcg64Mcg::new(RNG_SEED);
         let x = Array2::from_shape_fn((100, 80), |_| rng.sample::<f64, _>(StandardNormal));
 
         let mut pca = super::Pca::new(2);
-        let mut pca_rand = super::RandomizedPca::new(2, rng);
+        let mut pca_rand = super::RandomizedPca::with_rng(2, rng);
 
         assert!(pca.fit(&x).is_ok());
         assert!(pca_rand.fit(&x).is_ok());
@@ -627,7 +662,7 @@ mod test {
             .iter()
             .zip(pca_rand.singular_values().iter())
         {
-            assert_relative_eq!(a, b, max_relative = 0.02);
+            assert_relative_eq!(a, b, max_relative = 0.05);
         }
     }
 
@@ -635,8 +670,7 @@ mod test {
     #[cfg(feature = "serde")]
     fn randomized_pca_serialize() {
         use approx::AbsDiffEq;
-        let rng = Pcg32::from_seed(RNG_SEED);
-        let mut pca = super::RandomizedPca::new(1, rng);
+        let mut pca = super::RandomizedPca::with_seed(1, RNG_SEED);
         let x = arr2(&[[1_f32, 1_f32]]);
         assert!(pca.fit(&x).is_ok());
         let serialized = serde_json::to_string(&pca).unwrap();

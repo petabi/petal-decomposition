@@ -10,6 +10,16 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - Serialization/deserialization using serde.
+- `FastIca::with_seed` and `RandomizedPca::with_seed` to easily create a model
+  with a reproducible behavior.
+- `FastIca::with_rng` and `RandomizedPca::with_rng` to replace `new` in earlier
+  versions.
+
+### Changed
+
+- `FastIca::new` and `RandomizedPca::new` no longer requires a random number
+  generator; they uses a PCG random number genrator by default. Use `with_rng`
+  instead for a different random number generator.
 
 ## [0.3.0] - 2020-06-05
 
