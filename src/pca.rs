@@ -542,13 +542,14 @@ mod test {
     #[test]
     #[cfg(feature = "serde")]
     fn pca_serialize() {
+        use approx::AbsDiffEq;
         let mut pca = super::Pca::new(1);
         let x = arr2(&[[1_f32, 1_f32]]);
         assert!(pca.fit(&x).is_ok());
         let serialized = serde_json::to_string(&pca).unwrap();
         let deserialized: super::Pca<f32> = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(deserialized.components, pca.components);
-        assert_eq!(deserialized.means, pca.means);
+        assert!(deserialized.components.abs_diff_eq(&pca.components, 1e-12));
+        assert!(deserialized.means.abs_diff_eq(&pca.means, 1e12));
     }
 
     #[test]
@@ -633,14 +634,15 @@ mod test {
     #[test]
     #[cfg(feature = "serde")]
     fn randomized_pca_serialize() {
+        use approx::AbsDiffEq;
         let rng = Pcg32::from_seed(RNG_SEED);
         let mut pca = super::RandomizedPca::new(1, rng);
         let x = arr2(&[[1_f32, 1_f32]]);
         assert!(pca.fit(&x).is_ok());
         let serialized = serde_json::to_string(&pca).unwrap();
         let deserialized: super::Pca<f32> = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(deserialized.components, pca.components);
-        assert_eq!(deserialized.means, pca.means);
+        assert!(deserialized.components.abs_diff_eq(&pca.components, 1e-12));
+        assert!(deserialized.means.abs_diff_eq(&pca.means, 1e12));
     }
 
     #[test]

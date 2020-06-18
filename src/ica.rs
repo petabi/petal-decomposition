@@ -283,14 +283,15 @@ mod test {
     #[test]
     #[cfg(feature = "serde")]
     fn fast_ica_serialize() {
+        use approx::AbsDiffEq;
         let rng = Pcg32::from_seed(RNG_SEED);
         let x = arr2(&[[0., 0.], [1., 1.], [1., -1.]]);
         let mut ica = super::FastIca::new(rng);
         assert!(ica.fit(&x).is_ok());
         let serialized = serde_json::to_string(&ica).unwrap();
         let deserialized: super::FastIca<f64, Pcg32> = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(deserialized.components, ica.components);
-        assert_eq!(deserialized.means, ica.means);
+        assert!(deserialized.components.abs_diff_eq(&ica.components, 1e-12));
+        assert!(deserialized.means.abs_diff_eq(&ica.means, 1e12));
     }
 
     #[test]

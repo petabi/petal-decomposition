@@ -20,9 +20,9 @@ jobs:
       if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       run: cargo install cargo-tarpaulin
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --verbose --features "serialization"
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --verbose --features "serialization"
     - name: Generate coverage report
       if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       run: |

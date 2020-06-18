@@ -43,5 +43,9 @@ thiserror = "1"
 
 [dev-dependencies]
 approx = "0.3"
+ndarray = { version = "0.13", features = ["approx"] }
 rand_pcg = "0.2"
 serde_json = "1"
+
+[packages.metadata.docs.rs]
+features = ["serialization"]
