@@ -22,7 +22,10 @@ jobs:
     - name: Build
       run: cargo build --verbose --features "serialization"
     - name: Run tests
-      run: cargo test --verbose --features "serialization"
+      if: matrix.os == 'ubuntu-latest' || matrix.os == 'macOS-latest'
+      run: |
+        export LD_LIBRARY_PATH=`ls -d target/debug/build/intel-mkl-src-*/out`
+        cargo test --verbose --features "serialization"
     - name: Generate coverage report
       if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       run: |
