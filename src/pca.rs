@@ -64,20 +64,31 @@ where
         }
     }
 
+    /// Returns the principal axes in feature space.
+    #[inline]
+    pub fn components(&self) -> &Array2<A> {
+        &self.components
+    }
+
+    /// Returns the per-feature empirical mean.
+    #[inline]
+    pub fn mean(&self) -> &Array1<A> {
+        &self.means
+    }
+
     /// Returns the number of components.
-    #[must_use]
+    #[inline]
     pub fn n_components(&self) -> usize {
         self.components.nrows()
     }
 
     /// Returns sigular values.
-    #[must_use]
+    #[inline]
     pub fn singular_values(&self) -> &Array1<A::Real> {
         &self.singular
     }
 
     /// Returns the ratio of explained variance for each component.
-    #[must_use]
     pub fn explained_variance_ratio(&self) -> Array1<A::Real> {
         let mut variance: Array1<A::Real> = &self.singular * &self.singular;
         variance /= self.total_variance;
@@ -152,6 +163,27 @@ where
             }
             y
         })
+    }
+
+    /// Transforms data back to its original space.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DecompositionError::InvalidInput` if the number of rows of
+    /// `input` is different from that of the training data, or the number of
+    /// columns of `input` is different from the number of components.
+    pub fn inverse_transform<S>(
+        &self,
+        input: &ArrayBase<S, Ix2>,
+    ) -> Result<Array2<A>, DecompositionError>
+    where
+        S: Data<Elem = A>,
+    {
+        debug_assert_eq!(self.components.ncols(), self.means.len());
+        if input.ncols() != self.components.nrows() {
+            return Err(DecompositionError::InvalidInput);
+        }
+        Ok(input.dot(&self.components) + &self.means)
     }
 
     /// Fits the model with `input`.
@@ -288,20 +320,31 @@ where
         }
     }
 
+    /// Returns the principal axes in feature space.
+    #[inline]
+    pub fn components(&self) -> &Array2<A> {
+        &self.components
+    }
+
+    /// Returns the per-feature empirical mean.
+    #[inline]
+    pub fn mean(&self) -> &Array1<A> {
+        &self.means
+    }
+
     /// Returns the number of components.
-    #[must_use]
+    #[inline]
     pub fn n_components(&self) -> usize {
         self.components.nrows()
     }
 
     /// Returns sigular values.
-    #[must_use]
+    #[inline]
     pub fn singular_values(&self) -> &Array1<A::Real> {
         &self.singular
     }
 
     /// Returns the ratio of explained variance for each component.
-    #[must_use]
     pub fn explained_variance_ratio(&self) -> Array1<A::Real> {
         let mut variance: Array1<A::Real> = &self.singular * &self.singular;
         variance /= self.total_variance;
@@ -376,6 +419,27 @@ where
             }
             y
         })
+    }
+
+    /// Transforms data back to its original space.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DecompositionError::InvalidInput` if the number of rows of
+    /// `input` is different from that of the training data, or the number of
+    /// columns of `input` is different from the number of components.
+    pub fn inverse_transform<S>(
+        &self,
+        input: &ArrayBase<S, Ix2>,
+    ) -> Result<Array2<A>, DecompositionError>
+    where
+        S: Data<Elem = A>,
+    {
+        debug_assert_eq!(self.components.ncols(), self.means.len());
+        if input.ncols() != self.components.nrows() {
+            return Err(DecompositionError::InvalidInput);
+        }
+        Ok(input.dot(&self.components) + &self.means)
     }
 
     /// Fits the model with `input`.
@@ -507,7 +571,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use approx::{assert_abs_diff_eq, assert_relative_eq};
+    use approx::{assert_abs_diff_eq, assert_relative_eq, AbsDiffEq};
     use ndarray::{arr2, Array2};
     use rand::Rng;
     use rand_distr::StandardNormal;
@@ -548,10 +612,13 @@ mod test {
         assert_abs_diff_eq!(y[(0, 0)].abs(), 5., epsilon = 1e-10);
         assert_abs_diff_eq!(y[(1, 0)], 0., epsilon = 1e-10);
         assert_abs_diff_eq!(y[(2, 0)].abs(), 5., epsilon = 1e-10);
+        let z = pca.inverse_transform(&y).expect("valid input");
+        assert!(z.abs_diff_eq(&x, 1e-10));
 
         let mut pca = super::Pca::new(1);
         assert!(pca.fit(&x).is_ok());
         assert_eq!(pca.n_components(), 1);
+        assert!(pca.components().abs_diff_eq(&arr2(&[[-0.6, -0.8]]), 1e-10));
         let y = pca.transform(&x).unwrap();
         assert_abs_diff_eq!(y[(0, 0)].abs(), 5., epsilon = 1e-10);
         assert_abs_diff_eq!(y[(1, 0)], 0., epsilon = 1e-10);
@@ -584,8 +651,10 @@ mod test {
         assert!(pca.fit(&x).is_ok());
         let serialized = serde_json::to_string(&pca).unwrap();
         let deserialized: super::Pca<f32> = serde_json::from_str(&serialized).unwrap();
-        assert!(deserialized.components.abs_diff_eq(&pca.components, 1e-12));
-        assert!(deserialized.means.abs_diff_eq(&pca.means, 1e12));
+        assert!(deserialized
+            .components()
+            .abs_diff_eq(pca.components(), 1e-12));
+        assert!(deserialized.mean().abs_diff_eq(pca.mean(), 1e12));
     }
 
     #[test]
@@ -601,6 +670,8 @@ mod test {
         assert_abs_diff_eq!(y[(0, 0)].abs(), 5., epsilon = 1e-10);
         assert_abs_diff_eq!(y[(1, 0)], 0., epsilon = 1e-10);
         assert_abs_diff_eq!(y[(2, 0)].abs(), 5., epsilon = 1e-10);
+        let z = pca.inverse_transform(&y).expect("valid input");
+        assert!(z.abs_diff_eq(&x, 1e-10));
 
         let mut pca = super::RandomizedPca::with_rng(1, rand::thread_rng());
         let y = pca.fit_transform(&x).unwrap();
@@ -675,8 +746,10 @@ mod test {
         assert!(pca.fit(&x).is_ok());
         let serialized = serde_json::to_string(&pca).unwrap();
         let deserialized: super::Pca<f32> = serde_json::from_str(&serialized).unwrap();
-        assert!(deserialized.components.abs_diff_eq(&pca.components, 1e-12));
-        assert!(deserialized.means.abs_diff_eq(&pca.means, 1e12));
+        assert!(deserialized
+            .components()
+            .abs_diff_eq(pca.components(), 1e-12));
+        assert!(deserialized.mean().abs_diff_eq(pca.mean(), 1e12));
     }
 
     #[test]
