@@ -9,7 +9,7 @@ petal-decomposition provides matrix decomposition algorithms including PCA
 
 ## Requirements
 
-* Rust ≥ 1.38
+* Rust ≥ 1.40
 * BLAS/LAPACK backend (OpenBLAS, Netlib, or Intel MKL)
 
 ## Features
