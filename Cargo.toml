@@ -37,7 +37,7 @@ ndarray = "0.13"
 ndarray-linalg = "0.12"
 num-traits = "0.2"
 rand = "0.7"
-rand_distr = "0.3"
+rand_distr = "0.4"
 rand_pcg = "0.2"
 serde = { version = "1", features = ["derive"], optional = true }
 thiserror = "1"
