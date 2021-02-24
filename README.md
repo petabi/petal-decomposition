@@ -9,7 +9,7 @@ petal-decomposition provides matrix decomposition algorithms including PCA
 
 ## Requirements
 
-* Rust ≥ 1.40
+* Rust ≥ 1.42
 * BLAS/LAPACK backend (OpenBLAS, Netlib, or Intel MKL)
 
 ## Features
@@ -44,7 +44,7 @@ let y = pca.transform(&x).unwrap();      // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
 
 ## License
 
-Copyright 2020 Petabi, Inc.
+Copyright 2020-2021 Petabi, Inc.
 
 Licensed under [Apache License, Version 2.0][apache-license] (the "License");
 you may not use this crate except in compliance with the License.
