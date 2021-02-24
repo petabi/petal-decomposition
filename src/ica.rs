@@ -1,5 +1,5 @@
 use crate::DecompositionError;
-use ndarray::{Array, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2};
+use ndarray::{Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2};
 use ndarray_linalg::{Eigh, Lapack, Scalar, SVD, UPLO};
 use num_traits::FromPrimitive;
 use rand::{Rng, SeedableRng};
@@ -11,7 +11,6 @@ use rand_pcg::Mcg128Xsl64 as Pcg;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::cmp;
-use std::iter::FromIterator;
 
 /// Independent component analysis using the [FastICA] algorithm.
 ///
@@ -266,10 +265,10 @@ where
 {
     let (e, mut v) = input.dot(&input.t()).eigh(UPLO::Lower).unwrap();
     let v_t = v.t().to_owned();
-    let e_sqrt_inv = Array::from_iter(
-        e.iter()
-            .map(|r| Scalar::from_real(A::one().re() / r.sqrt())),
-    );
+    let e_sqrt_inv: Array1<A> = e
+        .iter()
+        .map(|r| Scalar::from_real(A::one().re() / r.sqrt()))
+        .collect();
     for mut row in v.lanes_mut(Axis(1)) {
         for (v_e, s_e) in row.iter_mut().zip(e_sqrt_inv.iter()) {
             *v_e *= *s_e;
@@ -287,12 +286,11 @@ where
         *elem = elem.tanh();
     }
     let ncols = A::from_usize(input.ncols()).expect("approximation");
-    let g_x = Array::from_iter(
-        input
-            .lanes(Axis(1))
-            .into_iter()
-            .map(|row| row.iter().map(|&elem| A::one() - elem * elem).sum::<A>() / ncols),
-    );
+    let g_x: Array1<A> = input
+        .lanes(Axis(1))
+        .into_iter()
+        .map(|row| row.iter().map(|&elem| A::one() - elem * elem).sum::<A>() / ncols)
+        .collect();
     (input, g_x)
 }
 
