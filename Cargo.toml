@@ -33,7 +33,7 @@ serialization = ["serde", "ndarray/serde", "rand/serde1", "rand_pcg/serde1"]
 [dependencies]
 itertools = "0.10"
 lapacke = "0.2"
-ndarray = "0.13"
+ndarray = "0.14"
 ndarray-linalg = "0.12"
 num-traits = "0.2"
 rand = "0.8"
@@ -44,7 +44,7 @@ thiserror = "1"
 
 [dev-dependencies]
 approx = "0.3"
-ndarray = { version = "0.13", features = ["approx"] }
+ndarray = { version = "0.14", features = ["approx"] }
 serde_json = "1"
 
 [packages.metadata.docs.rs]
