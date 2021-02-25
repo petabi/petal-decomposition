@@ -43,7 +43,7 @@ serde = { version = "1", features = ["derive"], optional = true }
 thiserror = "1"
 
 [dev-dependencies]
-approx = "0.3"
+approx = "0.4"
 ndarray = { version = "0.13", features = ["approx"] }
 serde_json = "1"
 
