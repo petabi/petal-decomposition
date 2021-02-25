@@ -31,7 +31,7 @@ openblas = ["ndarray-linalg/openblas"]
 serialization = ["serde", "ndarray/serde", "rand/serde1", "rand_pcg/serde1"]
 
 [dependencies]
-itertools = "0.9"
+itertools = "0.10"
 lapacke = "0.2"
 ndarray = "0.13"
 ndarray-linalg = "0.12"
