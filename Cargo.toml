@@ -31,20 +31,21 @@ openblas = ["ndarray-linalg/openblas"]
 serialization = ["serde", "ndarray/serde", "rand/serde1", "rand_pcg/serde1"]
 
 [dependencies]
-itertools = "0.9"
-lapacke = "0.2"
-ndarray = "0.13"
-ndarray-linalg = "0.12"
+itertools = "0.10"
+lapacke = "0.3"
+lax = "0.1.0"
+ndarray = "0.14.0"
+ndarray-linalg = "0.13"
 num-traits = "0.2"
-rand = "0.7"
-rand_distr = "0.3"
-rand_pcg = "0.2"
+rand = "0.8"
+rand_distr = "0.4"
+rand_pcg = "0.3"
 serde = { version = "1", features = ["derive"], optional = true }
 thiserror = "1"
 
 [dev-dependencies]
-approx = "0.3"
-ndarray = { version = "0.13", features = ["approx"] }
+approx = "0.4"
+ndarray = { version = "0.14", features = ["approx"] }
 serde_json = "1"
 
 [packages.metadata.docs.rs]

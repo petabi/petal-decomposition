@@ -1,3 +1,4 @@
+use lax::error::Error as LaxError;
 use ndarray::{s, ArrayBase, DataMut, Ix2};
 use ndarray_linalg::{c32, c64, error::LinalgError, AllocatedArray, MatrixLayout, Pivot, Scalar};
 use std::cmp;
@@ -69,11 +70,17 @@ macro_rules! impl_solve {
                 let (row, col) = l.size();
                 let k = ::std::cmp::min(row, col);
                 let mut ipiv = vec![0; k as usize];
-                let info = $getrf(l.lapacke_layout(), row, col, a, l.lda(), &mut ipiv);
+                let layout = match l {
+                    MatrixLayout::C { .. } => lapacke::Layout::RowMajor,
+                    MatrixLayout::F { .. } => lapacke::Layout::ColumnMajor,
+                };
+                let info = $getrf(layout, row, col, a, l.lda(), &mut ipiv);
                 if info >= 0 {
                     Ok(ipiv)
                 } else {
-                    Err(LinalgError::Lapack { return_code: info })
+                    Err(LinalgError::from(LaxError::LapackInvalidValue {
+                        return_code: info,
+                    }))
                 }
             }
         }
