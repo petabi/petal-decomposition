@@ -23,9 +23,10 @@ use std::cmp;
 /// # Examples
 ///
 /// ```
-/// use petal_decomposition::Pca;
+/// use petal_decomposition::{Pca, Scale, MeanCentered};
 ///
 /// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
+/// let x = MeanCentered::new(&x).unwrap().scale(&x);
 /// let y = Pca::new(1).fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
 /// assert!((y[(0, 0)].abs() - 2_f64.sqrt()).abs() < 1e-8);
 /// assert!(y[(1, 0)].abs() < 1e-8);
@@ -42,7 +43,7 @@ where
 {
     components: Array2<A>,
     n_samples: usize,
-    means: Array1<A>,
+    n_features: usize,
     total_variance: A::Real,
     singular: Array1<A::Real>,
 }
@@ -58,7 +59,7 @@ where
         Self {
             components: Array2::<A>::zeros((n_components, 0)),
             n_samples: 0,
-            means: Array1::<A>::zeros(0),
+            n_features: 0,
             total_variance: A::zero().re(),
             singular: Array1::<A::Real>::zeros(0),
         }
@@ -68,12 +69,6 @@ where
     #[inline]
     pub fn components(&self) -> &Array2<A> {
         &self.components
-    }
-
-    /// Returns the per-feature empirical mean.
-    #[inline]
-    pub fn mean(&self) -> &Array1<A> {
-        &self.means
     }
 
     /// Returns the number of components.
@@ -121,11 +116,10 @@ where
     where
         S: Data<Elem = A>,
     {
-        if input.ncols() != self.means.len() {
+        if input.ncols() != self.n_features {
             return Err(DecompositionError::InvalidInput);
         }
-        let x = input - &self.means;
-        Ok(x.dot(&self.components.t()))
+        Ok(input.dot(&self.components.t()))
     }
 
     /// Fits the model with `input` and apply the dimensionality reduction on
@@ -148,10 +142,11 @@ where
     where
         S: Data<Elem = A>,
     {
-        let u = self.inner_fit(input)?;
+        let n_rows = input.nrows();
+        let u = self.inner_fit(&input)?;
         Ok(unsafe {
             let mut y: ArrayBase<OwnedRepr<A>, Ix2> =
-                ArrayBase::uninitialized((input.nrows(), self.n_components()));
+                ArrayBase::uninitialized((n_rows, self.n_components()));
             for (y_row, u_row) in y
                 .lanes_mut(Axis(1))
                 .into_iter()
@@ -172,6 +167,11 @@ where
     /// Returns `DecompositionError::InvalidInput` if the number of rows of
     /// `input` is different from that of the training data, or the number of
     /// columns of `input` is different from the number of components.
+    ///
+    /// # Panics
+    ///
+    /// * Will panic if the number of columns in the components isn't equal to the number
+    ///   of features in the initial input data.
     pub fn inverse_transform<S>(
         &self,
         input: &ArrayBase<S, Ix2>,
@@ -179,10 +179,11 @@ where
     where
         S: Data<Elem = A>,
     {
+        debug_assert_eq!(self.components.ncols(), self.n_features);
         if input.ncols() != self.components.nrows() {
             return Err(DecompositionError::InvalidInput);
         }
-        Ok(input.dot(&self.components) + &self.means)
+        Ok(input.dot(&self.components))
     }
 
     /// Fits the model with `input`.
@@ -201,20 +202,18 @@ where
             return Err(DecompositionError::InvalidInput);
         }
 
-        let means = if let Some(means) = input.mean_axis(Axis(0)) {
-            means
-        } else {
+        if input.nrows() == 0 {
             return Ok(Array2::<A>::zeros((0, input.ncols())));
-        };
-        let x = input - &means;
-        let (u, sigma, vt) = x.svd(true, true)?;
+        }
+
+        let (u, sigma, vt) = input.svd(true, true)?;
         let mut u = u.expect("`svd` should return `u`");
         let mut vt = vt.expect("`svd` should return `vt`");
         svd_flip(&mut u, &mut vt);
         self.total_variance = sigma.dot(&sigma);
         self.components = vt.slice(s![0..self.n_components(), ..]).into_owned();
         self.n_samples = input.nrows();
-        self.means = means;
+        self.n_features = input.ncols();
         self.singular = sigma.slice(s![0..self.n_components()]).into_owned();
 
         Ok(u)
@@ -230,9 +229,10 @@ where
 /// # Examples
 ///
 /// ```
-/// use petal_decomposition::RandomizedPca;
+/// use petal_decomposition::{RandomizedPca, Scale, MeanCentered};
 ///
 /// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
+/// let x = MeanCentered::new(&x).unwrap().scale(&x);
 /// let mut pca = RandomizedPca::new(1);
 /// let y = pca.fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
 /// assert!((y[(0, 0)].abs() - 2_f64.sqrt()).abs() < 1e-8);
@@ -261,7 +261,7 @@ where
     rng: R,
     components: Array2<A>,
     n_samples: usize,
-    means: Array1<A>,
+    n_features: usize,
     total_variance: A::Real,
     singular: Array1<A::Real>,
 }
@@ -313,7 +313,7 @@ where
             rng,
             components: Array2::<A>::zeros((n_components, 0)),
             n_samples: 0,
-            means: Array1::<A>::zeros(0),
+            n_features: 0,
             total_variance: A::zero().re(),
             singular: Array1::<A::Real>::zeros(0),
         }
@@ -323,12 +323,6 @@ where
     #[inline]
     pub fn components(&self) -> &Array2<A> {
         &self.components
-    }
-
-    /// Returns the per-feature empirical mean.
-    #[inline]
-    pub fn mean(&self) -> &Array1<A> {
-        &self.means
     }
 
     /// Returns the number of components.
@@ -360,7 +354,7 @@ where
     ///   Decomposition routine fails.
     pub fn fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<(), DecompositionError>
     where
-        S: Data<Elem = A>,
+        S: DataMut<Elem = A>,
     {
         self.inner_fit(input)?;
         Ok(())
@@ -376,11 +370,10 @@ where
     where
         S: Data<Elem = A>,
     {
-        if input.ncols() != self.means.len() {
+        if input.ncols() != self.n_features {
             return Err(DecompositionError::InvalidInput);
         }
-        let x = input - &self.means;
-        Ok(x.dot(&self.components.t()))
+        Ok(input.dot(&self.components.t()))
     }
 
     /// Fits the model with `input` and apply the dimensionality reduction on
@@ -401,12 +394,13 @@ where
         input: &ArrayBase<S, Ix2>,
     ) -> Result<Array2<A>, DecompositionError>
     where
-        S: Data<Elem = A>,
+        S: DataMut<Elem = A>,
     {
-        let u = self.inner_fit(input)?;
+        let n_rows = input.nrows();
+        let u = self.inner_fit(&input)?;
         Ok(unsafe {
             let mut y: ArrayBase<OwnedRepr<A>, Ix2> =
-                ArrayBase::uninitialized((input.nrows(), self.n_components()));
+                ArrayBase::uninitialized((n_rows, self.n_components()));
             for (y_row, u_row) in y
                 .lanes_mut(Axis(1))
                 .into_iter()
@@ -427,6 +421,11 @@ where
     /// Returns `DecompositionError::InvalidInput` if the number of rows of
     /// `input` is different from that of the training data, or the number of
     /// columns of `input` is different from the number of components.
+    ///
+    /// # Panics
+    ///
+    /// * Will panic if the number of columns in the components isn't equal to the number
+    ///   of features in the initial input data.
     pub fn inverse_transform<S>(
         &self,
         input: &ArrayBase<S, Ix2>,
@@ -434,10 +433,11 @@ where
     where
         S: Data<Elem = A>,
     {
+        debug_assert_eq!(self.components.ncols(), self.n_features);
         if input.ncols() != self.components.nrows() {
             return Err(DecompositionError::InvalidInput);
         }
-        Ok(input.dot(&self.components) + &self.means)
+        Ok(input.dot(&self.components))
     }
 
     /// Fits the model with `input`.
@@ -450,23 +450,23 @@ where
     ///   Decomposition routine fails.
     fn inner_fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, DecompositionError>
     where
-        S: Data<Elem = A>,
+        S: DataMut<Elem = A>,
     {
         if input.shape().iter().any(|v| *v < self.n_components()) {
             return Err(DecompositionError::InvalidInput);
         }
 
-        let means = if let Some(means) = input.mean_axis(Axis(0)) {
-            means
-        } else {
+        if input.nrows() == 0 {
             return Ok(Array2::<A>::zeros((0, input.ncols())));
-        };
-        let x = input - &means;
-        let (u, sigma, vt) = randomized_svd(&x, self.n_components(), &mut self.rng)?;
-        self.total_variance = x.iter().fold(A::zero().re(), |var, &e| var + e.square());
+        }
+
+        let (u, sigma, vt) = randomized_svd(&input, self.n_components(), &mut self.rng)?;
+        self.total_variance = input
+            .iter()
+            .fold(A::zero().re(), |var, &e| var + e.square());
         self.components = vt.slice(s![0..self.n_components(), ..]).into_owned();
         self.n_samples = input.nrows();
-        self.means = means;
+        self.n_features = input.ncols();
         self.singular = sigma.slice(s![0..self.n_components()]).into_owned();
 
         Ok(u)
@@ -569,6 +569,7 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::scale::{MeanCentered, Scale};
     use approx::{assert_abs_diff_eq, assert_relative_eq, AbsDiffEq};
     use ndarray::{arr2, Array2};
     use rand::Rng;
@@ -582,11 +583,13 @@ mod test {
         let mut pca = super::Pca::new(0);
 
         let x = Array2::<f32>::zeros((0, 5));
+        // NB: Skipping mean centering here as performing mean centering on a zero sized matrix returns an error
         let y = pca.fit_transform(&x).unwrap();
         assert_eq!(y.nrows(), 0);
         assert_eq!(y.ncols(), 0);
 
         let x = arr2(&[[0_f32, 0_f32], [3_f32, 4_f32], [6_f32, 8_f32]]);
+        let x = MeanCentered::new(&x).unwrap().scale(&x);
         let y = pca.fit_transform(&x).unwrap();
         assert_eq!(y.nrows(), 3);
         assert_eq!(y.ncols(), 0);
@@ -596,13 +599,16 @@ mod test {
     fn pca_single_sample() {
         let mut pca = super::Pca::new(1);
         let x = arr2(&[[1_f32, 1_f32]]);
+        let x = MeanCentered::new(&x).unwrap().scale(&x);
         let y = pca.fit_transform(&x).unwrap();
         assert_eq!(y, arr2(&[[0.0]]));
     }
 
     #[test]
     fn pca() {
-        let x = arr2(&[[0_f64, 0_f64], [3_f64, 4_f64], [6_f64, 8_f64]]);
+        let x_orig = arr2(&[[0_f64, 0_f64], [3_f64, 4_f64], [6_f64, 8_f64]]);
+        let mean_scale = MeanCentered::new(&x_orig).unwrap();
+        let x = mean_scale.scale(&x_orig);
         let mut pca = super::Pca::new(1);
         assert_eq!(pca.n_components(), 1);
 
@@ -611,7 +617,8 @@ mod test {
         assert_abs_diff_eq!(y[(1, 0)], 0., epsilon = 1e-10);
         assert_abs_diff_eq!(y[(2, 0)].abs(), 5., epsilon = 1e-10);
         let z = pca.inverse_transform(&y).expect("valid input");
-        assert!(z.abs_diff_eq(&x, 1e-10));
+        let z = mean_scale.inverse_scale(&z);
+        assert!(z.abs_diff_eq(&x_orig, 1e-10));
 
         let mut pca = super::Pca::new(1);
         assert!(pca.fit(&x).is_ok());
@@ -633,6 +640,7 @@ mod test {
             [2_f64, 1_f64],
             [3_f64, 2_f64],
         ]);
+        let x = MeanCentered::new(&x).unwrap().scale(&x);
         let mut pca = super::Pca::new(2);
         assert!(pca.fit(&x).is_ok());
         let ratio = pca.explained_variance_ratio();
@@ -646,18 +654,23 @@ mod test {
         use approx::AbsDiffEq;
         let mut pca = super::Pca::new(1);
         let x = arr2(&[[1_f32, 1_f32]]);
+        let x = MeanCentered::new(&x).unwrap().scale(&x);
         assert!(pca.fit(&x).is_ok());
         let serialized = serde_json::to_string(&pca).unwrap();
         let deserialized: super::Pca<f32> = serde_json::from_str(&serialized).unwrap();
         assert!(deserialized
             .components()
             .abs_diff_eq(pca.components(), 1e-12));
-        assert!(deserialized.mean().abs_diff_eq(pca.mean(), 1e12));
+        assert!(deserialized
+            .singular_values()
+            .abs_diff_eq(pca.singular_values(), 1e12));
     }
 
     #[test]
     fn randomized_pca() {
-        let x = arr2(&[[0_f64, 0_f64], [3_f64, 4_f64], [6_f64, 8_f64]]);
+        let x_orig = arr2(&[[0_f64, 0_f64], [3_f64, 4_f64], [6_f64, 8_f64]]);
+        let mean_scale = MeanCentered::new(&x_orig).unwrap();
+        let x = mean_scale.scale(&x_orig);
         let mut pca = super::RandomizedPca::with_seed(1, RNG_SEED);
         assert_eq!(pca.n_components(), 1);
 
@@ -669,7 +682,8 @@ mod test {
         assert_abs_diff_eq!(y[(1, 0)], 0., epsilon = 1e-10);
         assert_abs_diff_eq!(y[(2, 0)].abs(), 5., epsilon = 1e-10);
         let z = pca.inverse_transform(&y).expect("valid input");
-        assert!(z.abs_diff_eq(&x, 1e-10));
+        let z = mean_scale.inverse_scale(&z);
+        assert!(z.abs_diff_eq(&x_orig, 1e-10));
 
         let mut pca = super::RandomizedPca::with_rng(1, rand::thread_rng());
         let y = pca.fit_transform(&x).unwrap();
@@ -688,6 +702,7 @@ mod test {
             [2_f64, 1_f64],
             [3_f64, 2_f64],
         ]);
+        let x = MeanCentered::new(&x).unwrap().scale(&x);
         let mut pca = super::RandomizedPca::with_rng(2, rand::thread_rng());
         assert!(pca.fit(&x).is_ok());
         let ratio = pca.explained_variance_ratio();
@@ -699,6 +714,7 @@ mod test {
     fn randomized_pca_explained_variance_equivalence() {
         let mut rng = Pcg64Mcg::new(RNG_SEED);
         let x = Array2::from_shape_fn((100, 80), |_| rng.sample::<f64, _>(StandardNormal));
+        let x = MeanCentered::new(&x).unwrap().scale(&x);
 
         let mut pca = super::Pca::new(2);
         let mut pca_rand = super::RandomizedPca::with_rng(2, rng);
@@ -719,6 +735,7 @@ mod test {
     fn randomized_pca_singular_values_consistency() {
         let mut rng = Pcg64Mcg::new(RNG_SEED);
         let x = Array2::from_shape_fn((100, 80), |_| rng.sample::<f64, _>(StandardNormal));
+        let x = MeanCentered::new(&x).unwrap().scale(&x);
 
         let mut pca = super::Pca::new(2);
         let mut pca_rand = super::RandomizedPca::with_rng(2, rng);
@@ -741,13 +758,16 @@ mod test {
         use approx::AbsDiffEq;
         let mut pca = super::RandomizedPca::with_seed(1, RNG_SEED);
         let x = arr2(&[[1_f32, 1_f32]]);
+        let x = MeanCentered::new(&x).unwrap().scale(&x);
         assert!(pca.fit(&x).is_ok());
         let serialized = serde_json::to_string(&pca).unwrap();
         let deserialized: super::Pca<f32> = serde_json::from_str(&serialized).unwrap();
         assert!(deserialized
             .components()
             .abs_diff_eq(pca.components(), 1e-12));
-        assert!(deserialized.mean().abs_diff_eq(pca.mean(), 1e12));
+        assert!(deserialized
+            .singular_values()
+            .abs_diff_eq(pca.singular_values(), 1e12));
     }
 
     #[test]
