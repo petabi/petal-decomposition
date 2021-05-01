@@ -33,9 +33,7 @@ jobs:
         cargo tarpaulin --out Xml
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
-      uses: codecov/codecov-action@master
-      with:
-        token: ${{secrets.CODECOV_TOKEN}}
+      uses: codecov/codecov-action@v1
 
   check:
     runs-on: ubuntu-latest
