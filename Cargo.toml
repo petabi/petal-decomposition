@@ -24,7 +24,7 @@ no-default-features = true
 [features]
 default = ["intel-mkl"]
 
-intel-mkl = ["ndarray-linalg/intel-mkl"]
+intel-mkl = ["ndarray-linalg/intel-mkl-system", "lax/intel-mkl-system", "lax/intel-mkl-download"]
 netlib = ["ndarray-linalg/netlib"]
 openblas = ["ndarray-linalg/openblas"]
 
@@ -33,9 +33,9 @@ serialization = ["serde", "ndarray/serde", "rand/serde1", "rand_pcg/serde1"]
 [dependencies]
 itertools = "0.10"
 lapacke = "0.3"
-lax = "0.1.0"
+lax = { git = "https://github.com/petabi/ndarray-linalg.git", branch = "ndarray-linalg-0.13.1-mkl-download" }
 ndarray = "0.14.0"
-ndarray-linalg = "0.13"
+ndarray-linalg = { git = "https://github.com/petabi/ndarray-linalg.git", branch = "ndarray-linalg-0.13.1-mkl-download" }
 num-traits = "0.2"
 rand = "0.8"
 rand_distr = "0.4"
