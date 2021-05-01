@@ -179,7 +179,6 @@ where
     where
         S: Data<Elem = A>,
     {
-        debug_assert_eq!(self.components.ncols(), self.means.len());
         if input.ncols() != self.components.nrows() {
             return Err(DecompositionError::InvalidInput);
         }
@@ -435,7 +434,6 @@ where
     where
         S: Data<Elem = A>,
     {
-        debug_assert_eq!(self.components.ncols(), self.means.len());
         if input.ncols() != self.components.nrows() {
             return Err(DecompositionError::InvalidInput);
         }
