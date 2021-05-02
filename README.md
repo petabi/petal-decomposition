@@ -20,8 +20,10 @@ petal-decomposition provides matrix decomposition algorithms including PCA
 
 ## Crate Features
 
-* `intel-mkl`, `netlib`, and `openblas` are used to select a BLAS/LAPACK
-  backend. By default, `intel-mkl` is used.
+* Use one of `intel-mkl-static`, `intel-mkl-system`, `netlib-static`, `netlib-system`,
+  `openblas-static`, and `openblas-system` to select a BLAS/LAPACK
+  backend.
+  See [ndarray-linalg's documentation][ndarray-linalg-features] for details.
 * `serialization` enables serialization/deserialization using [serde](https://crates.io/crates/serde).
 
 ## Examples
@@ -62,3 +64,4 @@ license][apache-license], shall be licensed as above, without any additional
 terms or conditions.
 
 [apache-license]: http://www.apache.org/licenses/LICENSE-2.0
+[ndarray-linalg-features]: https://github.com/rust-ndarray/ndarray-linalg#backend-features

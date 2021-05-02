@@ -11,6 +11,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Requires Rust 1.46 or later.
 - Updated ndarray to 0.14.
+- The backend feature is compatible with that of ndarray-linalg-0.13.
 
 ## [0.4.1] - 2020-07-17
 

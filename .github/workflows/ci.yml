@@ -15,22 +15,26 @@ jobs:
       uses: hecrj/setup-rust-action@v1
       with:
         rust-version: ${{ matrix.rust }}
+    - name: Install Intel MKL
+      if: matrix.os == 'macOS-latest'
+      run: |
+        sudo mkdir -p /opt/intel/mkl/lib/intel64
+        curl https://s3-ap-northeast-1.amazonaws.com/rust-intel-mkl/macos/2019.3/mkl-dynamic-lp64-seq.tar.zst | zstd -cd | sudo tar -xC /opt/intel/mkl/lib/intel64
     - uses: actions/checkout@master
     - name: Install Tarpaulin
       if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       run: cargo install cargo-tarpaulin
-    - name: Build
-      run: cargo build --verbose --features "serialization"
-    - name: Run tests
-      if: matrix.os == 'ubuntu-latest' || matrix.os == 'macOS-latest'
+    - name: Run tests on macOS
+      if: matrix.os == 'macOS-latest'
       run: |
-        export LD_LIBRARY_PATH=`ls -d target/debug/build/intel-mkl-src-*/out`
-        cargo test --verbose --features "serialization"
+        export LD_LIBRARY_PATH="/opt/intel/mkl/lib/intel64"
+        cargo test --verbose --features "intel-mkl-system, serialization"
+    - name: Run tests
+      if: matrix.os == 'ubuntu-latest' || matrix.os == 'windows-latest'
+      run: cargo test --verbose --features "intel-mkl-static, serialization"
     - name: Generate coverage report
       if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
-      run: |
-        export LD_LIBRARY_PATH=`ls -d target/debug/build/intel-mkl-src-*/out`
-        cargo tarpaulin --out Xml
+      run: cargo tarpaulin --out Xml --features "intel-mkl-static, serialization"
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       uses: codecov/codecov-action@v1
