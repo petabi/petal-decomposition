@@ -5,13 +5,13 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2021-05-02
 
 ### Changed
 
-- Requires Rust 1.46 or later.
 - Updated ndarray to 0.14.
-- The backend feature is compatible with that of ndarray-linalg-0.13.
+- The backend features are compatible with those of ndarray-linalg-0.13.
+- Requires Rust 1.46 or later.
 
 ## [0.4.1] - 2020-07-17
 
@@ -66,7 +66,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Principal component analysis (PCA).
 
-[Unreleased]: https://github.com/petabi/petal-decomposition/compare/0.4.1...master
+[0.5.0]: https://github.com/petabi/petal-decomposition/compare/0.4.1...0.5.0
 [0.4.1]: https://github.com/petabi/petal-decomposition/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/petabi/petal-decomposition/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/petabi/petal-decomposition/compare/0.2.0...0.3.0

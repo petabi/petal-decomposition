@@ -1,6 +1,6 @@
 [package]
 name = "petal-decomposition"
-version = "0.4.1"
+version = "0.5.0"
 description = """
 Matrix decomposition algorithms including PCA (principal component analysis)
 and ICA (independent component analysis)"""
