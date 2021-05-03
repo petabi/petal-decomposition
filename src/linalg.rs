@@ -1,7 +1,10 @@
 use lax::error::Error as LaxError;
-use ndarray::{s, ArrayBase, DataMut, Ix2};
-use ndarray_linalg::{c32, c64, AllocatedArray, MatrixLayout, Pivot, Scalar};
+use lax::layout::MatrixLayout;
+use ndarray::{s, ArrayBase, Axis, Data, DataMut, Ix2};
+use ndarray_linalg::{c32, c64, Pivot, Scalar};
 use std::cmp;
+use std::convert::TryFrom;
+use std::num::TryFromIntError;
 
 /// Computes P * L after LU decomposition.
 #[allow(
@@ -14,7 +17,7 @@ where
     A: Scalar + Lapack,
     S: DataMut<Elem = A>,
 {
-    let mut pivots = unsafe { A::lupiv(m.layout().unwrap(), m.as_slice_mut().unwrap()) }?;
+    let mut pivots = unsafe { A::lupiv(lax_layout(m).unwrap(), m.as_slice_mut().unwrap()) }?;
     if pivots.len() < m.nrows() {
         pivots.extend(pivots.len() as i32 + 1..=m.nrows() as i32);
     }
@@ -89,6 +92,38 @@ impl_solve!(f64, lapacke::dgetrf);
 impl_solve!(f32, lapacke::sgetrf);
 impl_solve!(c64, lapacke::zgetrf);
 impl_solve!(c32, lapacke::cgetrf);
+
+#[derive(Debug, thiserror::Error)]
+pub enum LayoutError {
+    #[error("memory not contiguous")]
+    NotContiguous,
+    #[error("too many columns: {0}")]
+    TooManyColumns(TryFromIntError),
+    #[error("too many rows: {0}")]
+    TooManyRows(TryFromIntError),
+}
+
+pub(crate) fn lax_layout<A, S>(a: &ArrayBase<S, Ix2>) -> Result<MatrixLayout, LayoutError>
+where
+    A: Scalar,
+    S: Data<Elem = A>,
+{
+    let nrows = i32::try_from(a.nrows()).map_err(LayoutError::TooManyRows)?;
+    let ncols = i32::try_from(a.ncols()).map_err(LayoutError::TooManyColumns)?;
+    if nrows as isize == a.stride_of(Axis(1)) {
+        Ok(MatrixLayout::F {
+            col: ncols,
+            lda: nrows,
+        })
+    } else if ncols as isize == a.stride_of(Axis(0)) {
+        Ok(MatrixLayout::C {
+            row: nrows,
+            lda: ncols,
+        })
+    } else {
+        Err(LayoutError::NotContiguous)
+    }
+}
 
 #[cfg(test)]
 mod test {
