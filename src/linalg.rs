@@ -1,6 +1,6 @@
 use lax::error::Error as LaxError;
 use ndarray::{s, ArrayBase, DataMut, Ix2};
-use ndarray_linalg::{c32, c64, error::LinalgError, AllocatedArray, MatrixLayout, Pivot, Scalar};
+use ndarray_linalg::{c32, c64, AllocatedArray, MatrixLayout, Pivot, Scalar};
 use std::cmp;
 
 /// Computes P * L after LU decomposition.
@@ -9,7 +9,7 @@ use std::cmp;
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap
 )]
-pub(crate) fn lu_pl<A, S>(m: &mut ArrayBase<S, Ix2>) -> Result<(), LinalgError>
+pub(crate) fn lu_pl<A, S>(m: &mut ArrayBase<S, Ix2>) -> Result<(), LaxError>
 where
     A: Scalar + Lapack,
     S: DataMut<Elem = A>,
@@ -60,13 +60,13 @@ where
 }
 
 pub trait Lapack: ndarray_linalg::Lapack + Sized {
-    unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Result<Pivot, LinalgError>;
+    unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Result<Pivot, LaxError>;
 }
 
 macro_rules! impl_solve {
     ($scalar:ty, $getrf:path) => {
         impl Lapack for $scalar {
-            unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Result<Pivot, LinalgError> {
+            unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Result<Pivot, LaxError> {
                 let (row, col) = l.size();
                 let k = ::std::cmp::min(row, col);
                 let mut ipiv = vec![0; k as usize];
@@ -78,9 +78,7 @@ macro_rules! impl_solve {
                 if info >= 0 {
                     Ok(ipiv)
                 } else {
-                    Err(LinalgError::from(LaxError::LapackInvalidValue {
-                        return_code: info,
-                    }))
+                    Err(LaxError::LapackInvalidValue { return_code: info })
                 }
             }
         }
