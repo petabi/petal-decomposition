@@ -1,7 +1,7 @@
 use crate::linalg::{lu_pl, Lapack};
 use crate::DecompositionError;
 use itertools::izip;
-use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, OwnedRepr, ScalarOperand};
+use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr, ScalarOperand};
 use ndarray_linalg::{error::LinalgError, QRInto, Scalar, UVTFlag, SVD, SVDDC};
 use num_traits::{real::Real, FromPrimitive};
 use rand::{Rng, RngCore, SeedableRng};
@@ -483,7 +483,7 @@ fn randomized_svd<A, S, R>(
 ) -> Result<Svd<A>, LinalgError>
 where
     A: Scalar + Lapack,
-    S: DataMut<Elem = A>,
+    S: Data<Elem = A>,
     R: RngCore,
 {
     let n_random = n_components + 10; // oversample by 10
