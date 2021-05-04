@@ -45,6 +45,7 @@ where
     means: Array1<A>,
     total_variance: A::Real,
     singular: Array1<A::Real>,
+    with_centering: bool,
 }
 
 impl<A> Pca<A>
@@ -61,7 +62,17 @@ where
             means: Array1::<A>::zeros(0),
             total_variance: A::zero().re(),
             singular: Array1::<A::Real>::zeros(0),
+            with_centering: true,
         }
+    }
+
+    /// Turn off mean-centering.
+    ///
+    /// This assumes that the input data is already centered.
+    /// *Note* [`Pca::mean()`] will return an [`Array1`] of 0's.
+    #[inline]
+    pub fn turn_off_mean_centering(&mut self) {
+        self.with_centering = false
     }
 
     /// Returns the principal axes in feature space.
@@ -201,13 +212,23 @@ where
             return Err(DecompositionError::InvalidInput);
         }
 
-        let means = if let Some(means) = input.mean_axis(Axis(0)) {
-            means
+        let means = if self.with_centering {
+            if let Some(means) = input.mean_axis(Axis(0)) {
+                means
+            } else {
+                return Ok(Array2::<A>::zeros((0, input.ncols())));
+            }
         } else {
-            return Ok(Array2::<A>::zeros((0, input.ncols())));
+            Array1::zeros(input.ncols())
         };
-        let x = input - &means;
-        let (u, sigma, vt) = x.svd(true, true)?;
+
+        // TODO: I can't figure out how to unify the type of x going into this!!
+        let (u, sigma, vt) = if self.with_centering {
+            (input - &means).svd(true, true)?
+        } else {
+            input.svd(true, true)?
+        };
+
         let mut u = u.expect("`svd` should return `u`");
         let mut vt = vt.expect("`svd` should return `vt`");
         svd_flip(&mut u, &mut vt);
@@ -264,6 +285,7 @@ where
     means: Array1<A>,
     total_variance: A::Real,
     singular: Array1<A::Real>,
+    with_centering: bool,
 }
 
 impl<A> RandomizedPca<A, Pcg>
@@ -316,7 +338,17 @@ where
             means: Array1::<A>::zeros(0),
             total_variance: A::zero().re(),
             singular: Array1::<A::Real>::zeros(0),
+            with_centering: true,
         }
+    }
+
+    /// Turn off mean-centering.
+    ///
+    /// This assumes that the input data is already centered.
+    /// *Note* [`Pca::mean()`] will return an [`Array1`] of 0's.
+    #[inline]
+    pub fn turn_off_mean_centering(&mut self) {
+        self.with_centering = false
     }
 
     /// Returns the principal axes in feature space.
@@ -456,14 +488,31 @@ where
             return Err(DecompositionError::InvalidInput);
         }
 
-        let means = if let Some(means) = input.mean_axis(Axis(0)) {
-            means
+        let means = if self.with_centering {
+            if let Some(means) = input.mean_axis(Axis(0)) {
+                means
+            } else {
+                return Ok(Array2::<A>::zeros((0, input.ncols())));
+            }
         } else {
-            return Ok(Array2::<A>::zeros((0, input.ncols())));
+            Array1::zeros(input.ncols())
         };
-        let x = input - &means;
-        let (u, sigma, vt) = randomized_svd(&x, self.n_components(), &mut self.rng)?;
-        self.total_variance = x.iter().fold(A::zero().re(), |var, &e| var + e.square());
+
+        // TODO: Again, unsure how to unify the type of `input` and `input - &means`
+        let (u, sigma, vt, total_variance) = if self.with_centering {
+            let x = input - &means;
+            let (u, sigma, vt) = randomized_svd(&x, self.n_components(), &mut self.rng)?;
+            let total_variance = x.iter().fold(A::zero().re(), |var, &e| var + e.square());
+            (u, sigma, vt, total_variance)
+        } else {
+            let (u, sigma, vt) = randomized_svd(input, self.n_components(), &mut self.rng)?;
+            let total_variance = input
+                .iter()
+                .fold(A::zero().re(), |var, &e| var + e.square());
+            (u, sigma, vt, total_variance)
+        };
+
+        self.total_variance = total_variance;
         self.components = vt.slice(s![0..self.n_components(), ..]).into_owned();
         self.n_samples = input.nrows();
         self.means = means;
