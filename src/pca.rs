@@ -23,10 +23,10 @@ use std::cmp;
 /// # Examples
 ///
 /// ```
-/// use petal_decomposition::Pca;
+/// use petal_decomposition::PcaBuilder;
 ///
 /// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
-/// let y = Pca::new(1).fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
+/// let y = PcaBuilder::new(1).build().fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
 /// assert!((y[(0, 0)].abs() - 2_f64.sqrt()).abs() < 1e-8);
 /// assert!(y[(1, 0)].abs() < 1e-8);
 /// assert!((y[(2, 0)].abs() - 2_f64.sqrt()).abs() < 1e-8);
@@ -45,7 +45,25 @@ where
     means: Array1<A>,
     total_variance: A::Real,
     singular: Array1<A::Real>,
-    with_centering: bool,
+    centering: bool,
+}
+
+impl<A> Pca<A>
+where
+    A: Scalar,
+{
+    /// Creates a PCA model with the given number of components.
+    #[must_use]
+    pub fn new(n_components: usize) -> Self {
+        Self {
+            components: Array2::<A>::zeros((n_components, 0)),
+            n_samples: 0,
+            means: Array1::<A>::zeros(0),
+            total_variance: A::zero().re(),
+            singular: Array1::<A::Real>::zeros(0),
+            centering: true,
+        }
+    }
 }
 
 impl<A> Pca<A>
@@ -53,30 +71,6 @@ where
     A: Scalar + Lapack,
     A::Real: ScalarOperand,
 {
-    /// Creates a PCA model with the given number of components.
-    #[must_use]
-    pub fn new(n_components: usize) -> Self {
-        Self::with_centering(n_components, true)
-    }
-
-    /// Creates a PCA model with the given number of components.
-    ///
-    /// `centering` determines whether or not to perform mean-centering
-    /// on input data. If the inputs are already centered, set `centering`
-    /// to `false`. *Note* [`Pca::mean()`] will return an [`Array1`] of 0's
-    /// if `with_centering` is `false`.
-    #[must_use]
-    pub fn with_centering(n_components: usize, centering: bool) -> Self {
-        Self {
-            components: Array2::<A>::zeros((n_components, 0)),
-            n_samples: 0,
-            means: Array1::<A>::zeros(0),
-            total_variance: A::zero().re(),
-            singular: Array1::<A::Real>::zeros(0),
-            with_centering: centering,
-        }
-    }
-
     /// Returns the principal axes in feature space.
     #[inline]
     pub fn components(&self) -> &Array2<A> {
@@ -214,7 +208,7 @@ where
             return Err(DecompositionError::InvalidInput);
         }
 
-        let means = if self.with_centering {
+        let means = if self.centering {
             if let Some(means) = input.mean_axis(Axis(0)) {
                 means
             } else {
@@ -225,7 +219,7 @@ where
         };
 
         // TODO: I can't figure out how to unify the type of x going into this!!
-        let (u, sigma, vt) = if self.with_centering {
+        let (u, sigma, vt) = if self.centering {
             (input - &means).svd(true, true)?
         } else {
             input.svd(true, true)?
@@ -244,6 +238,47 @@ where
     }
 }
 
+/// Builder for [`Pca`].
+#[allow(clippy::module_name_repetitions)]
+pub struct PcaBuilder {
+    n_components: usize,
+    centering: bool,
+}
+
+impl PcaBuilder {
+    /// Sets the number of components for PCA.
+    #[must_use]
+    pub fn new(n_components: usize) -> Self {
+        Self {
+            n_components,
+            centering: true,
+        }
+    }
+
+    /// Indicates whether or not to perform mean-centering on input data. It is
+    /// enabled by default. If the inputs are already centered, set `centering`
+    /// to `false`. *Note* [`Pca::mean()`] will return an [`Array1`] of 0's if
+    /// `centering` is `false`.
+    #[must_use]
+    pub fn centering(mut self, centering: bool) -> Self {
+        self.centering = centering;
+        self
+    }
+
+    /// Creates an instance of [`Pca`].
+    #[must_use]
+    pub fn build<A: Scalar>(self) -> Pca<A> {
+        Pca {
+            components: Array2::<A>::zeros((self.n_components, 0)),
+            n_samples: 0,
+            means: Array1::<A>::zeros(0),
+            total_variance: A::zero().re(),
+            singular: Array1::<A::Real>::zeros(0),
+            centering: self.centering,
+        }
+    }
+}
+
 /// Principal component analysis using randomized singular value decomposition.
 ///
 /// This uses randomized SVD (singular value decomposition) proposed by Halko et
@@ -253,10 +288,10 @@ where
 /// # Examples
 ///
 /// ```
-/// use petal_decomposition::RandomizedPca;
+/// use petal_decomposition::RandomizedPcaBuilder;
 ///
 /// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
-/// let mut pca = RandomizedPca::new(1);
+/// let mut pca = RandomizedPcaBuilder::new(1).build();
 /// let y = pca.fit_transform(&x).unwrap();  // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
 /// assert!((y[(0, 0)].abs() - 2_f64.sqrt()).abs() < 1e-8);
 /// assert!(y[(1, 0)].abs() < 1e-8);
@@ -287,13 +322,12 @@ where
     means: Array1<A>,
     total_variance: A::Real,
     singular: Array1<A::Real>,
-    with_centering: bool,
+    centering: bool,
 }
 
 impl<A> RandomizedPca<A, Pcg>
 where
-    A: Scalar + Lapack,
-    A::Real: ScalarOperand,
+    A: Scalar,
 {
     /// Creates a PCA model based on randomized SVD.
     ///
@@ -307,23 +341,6 @@ where
         Self::with_seed(n_components, seed)
     }
 
-    /// Creates a PCA model based on randomized SVD.
-    ///
-    /// `centering` determines whether or not to perform mean-centering
-    /// on input data. If the inputs are already centered, set `centering`
-    /// to `false`. *Note* [`Pca::mean()`] will return an [`Array1`] of 0's
-    /// if `with_centering` is `false`.
-    ///
-    /// The random matrix for randomized SVD is created from a PCG random number
-    /// generator (the XSL 128/64 (MCG) variant on a 64-bit CPU and the XSH RR
-    /// 64/32 (LCG) variant on a 32-bit CPU), initialized with a
-    /// randomly-generated seed.
-    #[must_use]
-    pub fn with_centering(n_components: usize, centering: bool) -> Self {
-        let seed: u128 = rand::thread_rng().gen();
-        Self::with_seed_and_centering(n_components, seed, centering)
-    }
-
     /// Creates a PCA model based on randomized SVD, with a PCG random number
     /// generator initialized with the given seed.
     ///
@@ -335,26 +352,29 @@ where
     #[must_use]
     pub fn with_seed(n_components: usize, seed: u128) -> Self {
         let rng = Pcg::from_seed(seed.to_be_bytes());
-        Self::with_rng_and_centering(n_components, rng, true)
+        Self::with_rng(n_components, rng)
     }
+}
 
-    /// Creates a PCA model based on randomized SVD, with a PCG random number
-    /// generator initialized with the given seed.
-    ///
-    /// `centering` determines whether or not to perform mean-centering
-    /// on input data. If the inputs are already centered, set `centering`
-    /// to `false`. *Note* [`Pca::mean()`] will return an [`Array1`] of 0's
-    /// if `with_centering` is `false`.
-    ///
-    /// It uses a PCG random number generator (the XSL 128/64 (MCG) variant on a
-    /// 64-bit CPU and the XSH RR 64/32 (LCG) variant on a 32-bit CPU). Use
-    /// [`with_rng`] for a different random number generator.
-    ///
-    /// [`with_rng`]: #method.with_rng
+impl<A, R> RandomizedPca<A, R>
+where
+    A: Scalar,
+    R: Rng,
+{
+    /// Creates a PCA model with the given number of components and random
+    /// number generator. The random number generator is used to create a random
+    /// matrix for randomized SVD.
     #[must_use]
-    pub fn with_seed_and_centering(n_components: usize, seed: u128, centering: bool) -> Self {
-        let rng = Pcg::from_seed(seed.to_be_bytes());
-        Self::with_rng_and_centering(n_components, rng, centering)
+    pub fn with_rng(n_components: usize, rng: R) -> Self {
+        Self {
+            rng,
+            components: Array2::<A>::zeros((n_components, 0)),
+            n_samples: 0,
+            means: Array1::<A>::zeros(0),
+            total_variance: A::zero().re(),
+            singular: Array1::<A::Real>::zeros(0),
+            centering: true,
+        }
     }
 }
 
@@ -364,44 +384,6 @@ where
     A::Real: ScalarOperand,
     R: Rng,
 {
-    /// Creates a PCA model with the given number of components and random
-    /// number generator. The random number generator is used to create a random
-    /// matrix for randomized SVD.
-    #[must_use]
-    pub fn with_rng(n_components: usize, rng: R) -> Self {
-        Self::with_rng_and_centering(n_components, rng, true)
-    }
-
-    /// Creates a PCA model with the given number of components and random
-    /// number generator. The random number generator is used to create a random
-    /// matrix for randomized SVD.
-    ///
-    /// `centering` determines whether or not to perform mean-centering
-    /// on input data. If the inputs are already centered, set `centering`
-    /// to `false`. *Note* [`Pca::mean()`] will return an [`Array1`] of 0's
-    /// if `with_centering` is `false`.
-    #[must_use]
-    pub fn with_rng_and_centering(n_components: usize, rng: R, centering: bool) -> Self {
-        Self {
-            rng,
-            components: Array2::<A>::zeros((n_components, 0)),
-            n_samples: 0,
-            means: Array1::<A>::zeros(0),
-            total_variance: A::zero().re(),
-            singular: Array1::<A::Real>::zeros(0),
-            with_centering: centering,
-        }
-    }
-
-    /// Turn off mean-centering.
-    ///
-    /// This assumes that the input data is already centered.
-    /// *Note* [`Pca::mean()`] will return an [`Array1`] of 0's.
-    #[inline]
-    pub fn turn_off_mean_centering(&mut self) {
-        self.with_centering = false
-    }
-
     /// Returns the principal axes in feature space.
     #[inline]
     pub fn components(&self) -> &Array2<A> {
@@ -539,7 +521,7 @@ where
             return Err(DecompositionError::InvalidInput);
         }
 
-        let means = if self.with_centering {
+        let means = if self.centering {
             if let Some(means) = input.mean_axis(Axis(0)) {
                 means
             } else {
@@ -550,7 +532,7 @@ where
         };
 
         // TODO: Again, unsure how to unify the type of `input` and `input - &means`
-        let (u, sigma, vt, total_variance) = if self.with_centering {
+        let (u, sigma, vt, total_variance) = if self.centering {
             let x = input - &means;
             let (u, sigma, vt) = randomized_svd(&x, self.n_components(), &mut self.rng)?;
             let total_variance = x.iter().fold(A::zero().re(), |var, &e| var + e.square());
@@ -570,6 +552,76 @@ where
         self.singular = sigma.slice(s![0..self.n_components()]).into_owned();
 
         Ok(u)
+    }
+}
+
+/// Builder for [`RandomizedPca`].
+pub struct RandomizedPcaBuilder<R> {
+    n_components: usize,
+    rng: R,
+    centering: bool,
+}
+
+impl RandomizedPcaBuilder<Pcg> {
+    /// Sets the number of components for PCA.
+    ///
+    /// The random matrix for randomized SVD is created from a PCG random number
+    /// generator (the XSL 128/64 (MCG) variant on a 64-bit CPU and the XSH RR
+    /// 64/32 (LCG) variant on a 32-bit CPU), initialized with a
+    /// randomly-generated seed.
+    #[must_use]
+    pub fn new(n_components: usize) -> Self {
+        let seed: u128 = rand::thread_rng().gen();
+        Self {
+            n_components,
+            rng: Pcg::from_seed(seed.to_be_bytes()),
+            centering: true,
+        }
+    }
+
+    /// Initialized the PCG random number genernator with the given seed.
+    #[must_use]
+    pub fn seed(mut self, seed: u128) -> Self {
+        self.rng = Pcg::from_seed(seed.to_be_bytes());
+        self
+    }
+
+    /// Indicates whether or not to perform mean-centering on input data. It is
+    /// enabled by default. If the inputs are already centered, set `centering`
+    /// to `false`. *Note* [`Pca::mean()`] will return an [`Array1`] of 0's if
+    /// `centering` is `false`.
+    #[must_use]
+    pub fn centering(mut self, centering: bool) -> Self {
+        self.centering = centering;
+        self
+    }
+}
+
+impl<R: Rng> RandomizedPcaBuilder<R> {
+    /// Sets the number of components and random number generator for PCA.
+    ///
+    /// The random number generator is used to create a random matrix for
+    /// randomized SVD.
+    #[must_use]
+    pub fn with_rng(n_components: usize, rng: R) -> Self {
+        Self {
+            n_components,
+            rng,
+            centering: true,
+        }
+    }
+
+    /// Creates an instance of [`RandomizedPca`].
+    pub fn build<A: Scalar>(self) -> RandomizedPca<A, R> {
+        RandomizedPca {
+            rng: self.rng,
+            components: Array2::<A>::zeros((self.n_components, 0)),
+            n_samples: 0,
+            means: Array1::<A>::zeros(0),
+            total_variance: A::zero().re(),
+            singular: Array1::<A::Real>::zeros(0),
+            centering: self.centering,
+        }
     }
 }
 
@@ -679,7 +731,7 @@ mod test {
 
     #[test]
     fn pca_zero_component() {
-        let mut pca = super::Pca::new(0);
+        let mut pca = super::PcaBuilder::new(0).build();
 
         let x = Array2::<f32>::zeros((0, 5));
         let y = pca.fit_transform(&x).unwrap();
@@ -721,6 +773,16 @@ mod test {
         assert_abs_diff_eq!(y[(0, 0)].abs(), 5., epsilon = 1e-10);
         assert_abs_diff_eq!(y[(1, 0)], 0., epsilon = 1e-10);
         assert_abs_diff_eq!(y[(2, 0)].abs(), 5., epsilon = 1e-10);
+    }
+
+    #[test]
+    fn pca_without_centering() {
+        let x = arr2(&[[0_f64, 0_f64], [3_f64, 4_f64], [6_f64, 8_f64]]);
+        let mut pca = super::PcaBuilder::new(1).centering(false).build();
+        let y = pca.fit_transform(&x).unwrap();
+        assert_abs_diff_eq!(y[(0, 0)].abs(), 0., epsilon = 1e-10);
+        assert_abs_diff_eq!(y[(1, 0)], 5., epsilon = 1e-10);
+        assert_abs_diff_eq!(y[(2, 0)].abs(), 10., epsilon = 1e-10);
     }
 
     #[test]

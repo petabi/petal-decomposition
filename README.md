@@ -36,12 +36,12 @@ use ndarray::arr2;
 use petal_decomposition::Pca;
 
 let x = arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [2_f64, 2_f64]]);
-let mut pca = Pca::new(2);               // Keep two dimensions.
+let mut pca = PcaBuilder::new(2).build(); // Keep two dimensions.
 pca.fit(&x).unwrap();
 
-let s = pca.singular_values();           // [2_f64, 0_f64]
-let v = pca.explained_variance_ratio();  // [1_f64, 0_f64]
-let y = pca.transform(&x).unwrap();      // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
+let s = pca.singular_values();            // [2_f64, 0_f64]
+let v = pca.explained_variance_ratio();   // [1_f64, 0_f64]
+let y = pca.transform(&x).unwrap();       // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()]
 ```
 
 ## License

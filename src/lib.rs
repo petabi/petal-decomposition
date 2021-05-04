@@ -4,7 +4,7 @@ mod pca;
 
 pub use ica::FastIca;
 use ndarray_linalg::error::LinalgError;
-pub use pca::{Pca, RandomizedPca};
+pub use pca::{Pca, PcaBuilder, RandomizedPca, RandomizedPcaBuilder};
 use thiserror::Error;
 
 /// The error type for PCA operations.
