@@ -2,7 +2,7 @@ mod ica;
 mod linalg;
 mod pca;
 
-pub use ica::FastIca;
+pub use ica::{FastIca, FastIcaBuilder};
 use ndarray_linalg::error::LinalgError;
 pub use pca::{Pca, PcaBuilder, RandomizedPca, RandomizedPcaBuilder};
 use thiserror::Error;

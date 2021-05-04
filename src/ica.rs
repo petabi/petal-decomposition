@@ -19,10 +19,10 @@ use std::cmp;
 /// # Examples
 ///
 /// ```
-/// use petal_decomposition::FastIca;
+/// use petal_decomposition::FastIcaBuilder;
 ///
 /// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64], [1_f64, -1_f64]]);
-/// let mut ica = FastIca::new();
+/// let mut ica = FastIcaBuilder::new().build();
 /// let y = ica.fit_transform(&x).unwrap();
 /// ```
 #[cfg_attr(
@@ -211,6 +211,92 @@ where
 {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Builder for [`FastIca`].
+///
+/// # Examples
+///
+/// ```
+/// use petal_decomposition::FastIcaBuilder;
+///
+/// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64]]);
+/// let mut ica = FastIcaBuilder::new().build();
+/// ica.fit(&x);
+/// ```
+pub struct FastIcaBuilder<R> {
+    rng: R,
+}
+
+impl FastIcaBuilder<Pcg> {
+    /// Sets the number of components for PCA.
+    ///
+    /// It uses a PCG random number generator (the XSL 128/64 (MCG) variant on a
+    /// 64-bit CPU and the XSH RR 64/32 (LCG) variant on a 32-bit CPU),
+    /// initialized with a randomly-generated seed.
+    #[must_use]
+    pub fn new() -> Self {
+        let seed: u128 = rand::thread_rng().gen();
+        Self {
+            rng: Pcg::from_seed(seed.to_be_bytes()),
+        }
+    }
+
+    /// Initialized the PCG random number genernator with the given seed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use petal_decomposition::FastIcaBuilder;
+    ///
+    /// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64]]);
+    /// let mut ica = FastIcaBuilder::new().seed(1234567891011121314).build();
+    /// ica.fit(&x);
+    /// ```
+    #[must_use]
+    pub fn seed(mut self, seed: u128) -> Self {
+        self.rng = Pcg::from_seed(seed.to_be_bytes());
+        self
+    }
+}
+
+impl<R: Rng> FastIcaBuilder<R> {
+    /// Sets the random number generator for FastICA.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use petal_decomposition::FastIcaBuilder;
+    /// use rand_pcg::Pcg64;
+    ///
+    /// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64]]);
+    /// let rng = Pcg64::new(0xcafef00dd15ea5e5, 0xa02bdbf7bb3c0a7ac28fa16a64abf96);
+    /// let mut ica = FastIcaBuilder::with_rng(rng).build();
+    /// ica.fit(&x);
+    /// ```
+    #[must_use]
+    pub fn with_rng(rng: R) -> Self {
+        Self { rng }
+    }
+
+    /// Creates an instance of [`FastIca`].
+    pub fn build<A: Scalar>(self) -> FastIca<A, R> {
+        FastIca {
+            rng: self.rng,
+            components: Array2::<A>::zeros((0, 0)),
+            means: Array1::<A>::zeros(0),
+            n_iter: 0,
+        }
+    }
+}
+
+impl Default for FastIcaBuilder<Pcg> {
+    fn default() -> Self {
+        let seed: u128 = rand::thread_rng().gen();
+        Self {
+            rng: Pcg::from_seed(seed.to_be_bytes()),
+        }
     }
 }
 

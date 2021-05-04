@@ -11,6 +11,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `PcaBuilder` and `RandomizedPcaBuilder` to create instances of `Pca` and
   `RandomizedPca`, respectively.
+- `FastIcaBuilder` to create instances of `FastIca`.
 - `Pca` and `RandomizedPca` are optionally set to skip mean-centering input,
   using `PcaBuilder::centering` and `RandomizedPcaBuilder::centering`. By
   default they always mean-center input. (by @sstadick)
