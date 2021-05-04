@@ -282,8 +282,8 @@ impl PcaBuilder {
 /// Principal component analysis using randomized singular value decomposition.
 ///
 /// This uses randomized SVD (singular value decomposition) proposed by Halko et
-/// al. [1] to reduce the dimensionality of the input data. The data is centered
-/// for each feature before applying randomized SVD.
+/// al. \[1\] to reduce the dimensionality of the input data. The data is
+/// centered for each feature before applying randomized SVD.
 ///
 /// # Examples
 ///
