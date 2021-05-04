@@ -56,23 +56,25 @@ where
     /// Creates a PCA model with the given number of components.
     #[must_use]
     pub fn new(n_components: usize) -> Self {
+        Self::with_centering(n_components, true)
+    }
+
+    /// Creates a PCA model with the given number of components.
+    ///
+    /// `centering` determines whether or not to perform mean-centering
+    /// on input data. If the inputs are already centered, set `centering`
+    /// to `false`. *Note* [`Pca::mean()`] will return an [`Array1`] of 0's
+    /// if `with_centering` is `false`.
+    #[must_use]
+    pub fn with_centering(n_components: usize, centering: bool) -> Self {
         Self {
             components: Array2::<A>::zeros((n_components, 0)),
             n_samples: 0,
             means: Array1::<A>::zeros(0),
             total_variance: A::zero().re(),
             singular: Array1::<A::Real>::zeros(0),
-            with_centering: true,
+            with_centering: centering,
         }
-    }
-
-    /// Turn off mean-centering.
-    ///
-    /// This assumes that the input data is already centered.
-    /// *Note* [`Pca::mean()`] will return an [`Array1`] of 0's.
-    #[inline]
-    pub fn turn_off_mean_centering(&mut self) {
-        self.with_centering = false
     }
 
     /// Returns the principal axes in feature space.
@@ -305,6 +307,23 @@ where
         Self::with_seed(n_components, seed)
     }
 
+    /// Creates a PCA model based on randomized SVD.
+    ///
+    /// `centering` determines whether or not to perform mean-centering
+    /// on input data. If the inputs are already centered, set `centering`
+    /// to `false`. *Note* [`Pca::mean()`] will return an [`Array1`] of 0's
+    /// if `with_centering` is `false`.
+    ///
+    /// The random matrix for randomized SVD is created from a PCG random number
+    /// generator (the XSL 128/64 (MCG) variant on a 64-bit CPU and the XSH RR
+    /// 64/32 (LCG) variant on a 32-bit CPU), initialized with a
+    /// randomly-generated seed.
+    #[must_use]
+    pub fn with_centering(n_components: usize, centering: bool) -> Self {
+        let seed: u128 = rand::thread_rng().gen();
+        Self::with_seed_and_centering(n_components, seed, centering)
+    }
+
     /// Creates a PCA model based on randomized SVD, with a PCG random number
     /// generator initialized with the given seed.
     ///
@@ -316,7 +335,26 @@ where
     #[must_use]
     pub fn with_seed(n_components: usize, seed: u128) -> Self {
         let rng = Pcg::from_seed(seed.to_be_bytes());
-        Self::with_rng(n_components, rng)
+        Self::with_rng_and_centering(n_components, rng, true)
+    }
+
+    /// Creates a PCA model based on randomized SVD, with a PCG random number
+    /// generator initialized with the given seed.
+    ///
+    /// `centering` determines whether or not to perform mean-centering
+    /// on input data. If the inputs are already centered, set `centering`
+    /// to `false`. *Note* [`Pca::mean()`] will return an [`Array1`] of 0's
+    /// if `with_centering` is `false`.
+    ///
+    /// It uses a PCG random number generator (the XSL 128/64 (MCG) variant on a
+    /// 64-bit CPU and the XSH RR 64/32 (LCG) variant on a 32-bit CPU). Use
+    /// [`with_rng`] for a different random number generator.
+    ///
+    /// [`with_rng`]: #method.with_rng
+    #[must_use]
+    pub fn with_seed_and_centering(n_components: usize, seed: u128, centering: bool) -> Self {
+        let rng = Pcg::from_seed(seed.to_be_bytes());
+        Self::with_rng_and_centering(n_components, rng, centering)
     }
 }
 
@@ -331,6 +369,19 @@ where
     /// matrix for randomized SVD.
     #[must_use]
     pub fn with_rng(n_components: usize, rng: R) -> Self {
+        Self::with_rng_and_centering(n_components, rng, true)
+    }
+
+    /// Creates a PCA model with the given number of components and random
+    /// number generator. The random number generator is used to create a random
+    /// matrix for randomized SVD.
+    ///
+    /// `centering` determines whether or not to perform mean-centering
+    /// on input data. If the inputs are already centered, set `centering`
+    /// to `false`. *Note* [`Pca::mean()`] will return an [`Array1`] of 0's
+    /// if `with_centering` is `false`.
+    #[must_use]
+    pub fn with_rng_and_centering(n_components: usize, rng: R, centering: bool) -> Self {
         Self {
             rng,
             components: Array2::<A>::zeros((n_components, 0)),
@@ -338,7 +389,7 @@ where
             means: Array1::<A>::zeros(0),
             total_variance: A::zero().re(),
             singular: Array1::<A::Real>::zeros(0),
-            with_centering: true,
+            with_centering: centering,
         }
     }
 
