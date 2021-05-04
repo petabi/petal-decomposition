@@ -11,6 +11,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `PcaBuilder` and `RandomizedPcaBuilder` to create instances of `Pca` and
   `RandomizedPca`, respectively.
+- `Pca` and `RandomizedPca` are optionally set to skip mean-centering input,
+  using `PcaBuilder::centering` and `RandomizedPcaBuilder::centering`. By
+  default they always mean-center input. (by @sstadick)
 
 ## [0.5.0] - 2021-05-02
 
@@ -73,6 +76,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Principal component analysis (PCA).
 
+[Unreleased]: https://github.com/petabi/petal-decomposition/compare/0.5.0...main
 [0.5.0]: https://github.com/petabi/petal-decomposition/compare/0.4.1...0.5.0
 [0.4.1]: https://github.com/petabi/petal-decomposition/compare/0.4.0...0.4.1
 [0.4.0]: https://github.com/petabi/petal-decomposition/compare/0.3.0...0.4.0
