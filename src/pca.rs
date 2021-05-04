@@ -603,7 +603,7 @@ impl<R: Rng> RandomizedPcaBuilder<R> {
     /// The random number generator is used to create a random matrix for
     /// randomized SVD.
     #[must_use]
-    pub fn with_rng(n_components: usize, rng: R) -> Self {
+    pub fn with_rng(rng: R, n_components: usize) -> Self {
         Self {
             n_components,
             rng,
