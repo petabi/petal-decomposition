@@ -128,17 +128,7 @@ where
     where
         S: Data<Elem = A>,
     {
-        if input.ncols() != self.means.len() {
-            return Err(DecompositionError::InvalidInput);
-        }
-
-        let transformed = if self.centering {
-            let x = input - &self.means;
-            x.dot(&self.components.t())
-        } else {
-            input.dot(&self.components.t())
-        };
-        Ok(transformed)
+        transform(input, &self.components, &self.means, self.centering)
     }
 
     /// Fits the model with `input` and apply the dimensionality reduction on
@@ -162,20 +152,12 @@ where
         S: Data<Elem = A>,
     {
         let u = self.inner_fit(input)?;
-        Ok(unsafe {
-            let mut y: ArrayBase<OwnedRepr<A>, Ix2> =
-                ArrayBase::uninitialized((input.nrows(), self.n_components()));
-            for (y_row, u_row) in y
-                .lanes_mut(Axis(1))
-                .into_iter()
-                .zip(u.slice(s![.., 0..self.n_components()]).lanes(Axis(1)))
-            {
-                for (y_v, u_v, sigma_v) in izip!(y_row.into_iter(), u_row, &self.singular) {
-                    *y_v = *u_v * A::from_real(*sigma_v);
-                }
-            }
-            y
-        })
+        Ok(transform_with_u(
+            &u,
+            input,
+            self.singular_values(),
+            self.n_components(),
+        ))
     }
 
     /// Transforms data back to its original space.
@@ -192,16 +174,7 @@ where
     where
         S: Data<Elem = A>,
     {
-        if input.ncols() != self.components.nrows() {
-            return Err(DecompositionError::InvalidInput);
-        }
-
-        let inverse_transformed = if self.centering {
-            input.dot(&self.components) + &self.means
-        } else {
-            input.dot(&self.components)
-        };
-        Ok(inverse_transformed)
+        inverse_transform(input, &self.components, &self.means, self.centering)
     }
 
     /// Fits the model with `input`.
@@ -452,17 +425,7 @@ where
     where
         S: Data<Elem = A>,
     {
-        if input.ncols() != self.means.len() {
-            return Err(DecompositionError::InvalidInput);
-        }
-
-        let transformed = if self.centering {
-            let x = input - &self.means;
-            x.dot(&self.components.t())
-        } else {
-            input.dot(&self.components.t())
-        };
-        Ok(transformed)
+        transform(input, &self.components, &self.means, self.centering)
     }
 
     /// Fits the model with `input` and apply the dimensionality reduction on
@@ -486,20 +449,12 @@ where
         S: Data<Elem = A>,
     {
         let u = self.inner_fit(input)?;
-        Ok(unsafe {
-            let mut y: ArrayBase<OwnedRepr<A>, Ix2> =
-                ArrayBase::uninitialized((input.nrows(), self.n_components()));
-            for (y_row, u_row) in y
-                .lanes_mut(Axis(1))
-                .into_iter()
-                .zip(u.slice(s![.., 0..self.n_components()]).lanes(Axis(1)))
-            {
-                for (y_v, u_v, sigma_v) in izip!(y_row.into_iter(), u_row, &self.singular) {
-                    *y_v = *u_v * A::from_real(*sigma_v);
-                }
-            }
-            y
-        })
+        Ok(transform_with_u(
+            &u,
+            input,
+            self.singular_values(),
+            self.n_components(),
+        ))
     }
 
     /// Transforms data back to its original space.
@@ -516,15 +471,7 @@ where
     where
         S: Data<Elem = A>,
     {
-        if input.ncols() != self.components.nrows() {
-            return Err(DecompositionError::InvalidInput);
-        }
-        let inverse_transformed = if self.centering {
-            input.dot(&self.components) + &self.means
-        } else {
-            input.dot(&self.components)
-        };
-        Ok(inverse_transformed)
+        inverse_transform(input, &self.components, &self.means, self.centering)
     }
 
     /// Fits the model with `input`.
@@ -699,6 +646,94 @@ where
     }
     let (q, _) = q.qr_into()?;
     Ok(q)
+}
+
+/// Applies dimensionality reduction to `input`.
+///
+/// # Errors
+///
+/// * `DecompositionError::InvalidInput` if the number of features in
+///   `input` does not match that of the training data.
+fn transform<A, S>(
+    input: &ArrayBase<S, Ix2>,
+    components: &Array2<A>,
+    means: &Array1<A>,
+    centering: bool,
+) -> Result<Array2<A>, DecompositionError>
+where
+    A: Scalar,
+    S: Data<Elem = A>,
+{
+    if input.ncols() != means.len() {
+        return Err(DecompositionError::InvalidInput);
+    }
+
+    let transformed = if centering {
+        let x = input - means;
+        x.dot(&components.t())
+    } else {
+        input.dot(&components.t())
+    };
+    Ok(transformed)
+}
+
+/// Applies dimensionality reduction to `input`, given matrix `u`.
+///
+/// # Errors
+///
+/// Returns `DecompositionError::LinalgError` if the underlying Singular
+/// Vector Decomposition routine fails.
+fn transform_with_u<A, S>(
+    u: &Array2<A>,
+    input: &ArrayBase<S, Ix2>,
+    singular: &Array1<A::Real>,
+    n_components: usize,
+) -> Array2<A>
+where
+    A: Scalar,
+    S: Data<Elem = A>,
+{
+    let mut y: ArrayBase<OwnedRepr<A>, Ix2> = // initialized in the following `for` loop
+        unsafe { ArrayBase::uninitialized((input.nrows(), n_components)) };
+    for (y_row, u_row) in y
+        .lanes_mut(Axis(1))
+        .into_iter()
+        .zip(u.slice(s![.., 0..n_components]).lanes(Axis(1)))
+    {
+        for (y_v, u_v, sigma_v) in izip!(y_row.into_iter(), u_row, singular) {
+            *y_v = *u_v * A::from_real(*sigma_v);
+        }
+    }
+    y
+}
+
+/// Transforms data back to its original space.
+///
+/// # Errors
+///
+/// Returns `DecompositionError::InvalidInput` if the number of rows of
+/// `input` is different from that of the training data, or the number of
+/// columns of `input` is different from the number of components.
+fn inverse_transform<A, S>(
+    input: &ArrayBase<S, Ix2>,
+    components: &Array2<A>,
+    means: &Array1<A>,
+    centering: bool,
+) -> Result<Array2<A>, DecompositionError>
+where
+    A: Scalar,
+    S: Data<Elem = A>,
+{
+    if input.ncols() != components.nrows() {
+        return Err(DecompositionError::InvalidInput);
+    }
+
+    let inverse_transformed = if centering {
+        input.dot(components) + means
+    } else {
+        input.dot(components)
+    };
+    Ok(inverse_transformed)
 }
 
 /// Makes `SVD`'s output deterministic using the columns of `u` as the basis for
