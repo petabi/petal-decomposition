@@ -131,8 +131,14 @@ where
         if input.ncols() != self.means.len() {
             return Err(DecompositionError::InvalidInput);
         }
-        let x = input - &self.means;
-        Ok(x.dot(&self.components.t()))
+
+        let transformed = if self.centering {
+            let x = input - &self.means;
+            x.dot(&self.components.t())
+        } else {
+            input.dot(&self.components.t())
+        };
+        Ok(transformed)
     }
 
     /// Fits the model with `input` and apply the dimensionality reduction on
@@ -189,7 +195,13 @@ where
         if input.ncols() != self.components.nrows() {
             return Err(DecompositionError::InvalidInput);
         }
-        Ok(input.dot(&self.components) + &self.means)
+
+        let inverse_transformed = if self.centering {
+            input.dot(&self.components) + &self.means
+        } else {
+            input.dot(&self.components)
+        };
+        Ok(inverse_transformed)
     }
 
     /// Fits the model with `input`.
@@ -218,7 +230,6 @@ where
             Array1::zeros(input.ncols())
         };
 
-        // TODO: I can't figure out how to unify the type of x going into this!!
         let (u, sigma, vt) = if self.centering {
             (input - &means).svd(true, true)?
         } else {
@@ -444,8 +455,14 @@ where
         if input.ncols() != self.means.len() {
             return Err(DecompositionError::InvalidInput);
         }
-        let x = input - &self.means;
-        Ok(x.dot(&self.components.t()))
+
+        let transformed = if self.centering {
+            let x = input - &self.means;
+            x.dot(&self.components.t())
+        } else {
+            input.dot(&self.components.t())
+        };
+        Ok(transformed)
     }
 
     /// Fits the model with `input` and apply the dimensionality reduction on
@@ -502,7 +519,12 @@ where
         if input.ncols() != self.components.nrows() {
             return Err(DecompositionError::InvalidInput);
         }
-        Ok(input.dot(&self.components) + &self.means)
+        let inverse_transformed = if self.centering {
+            input.dot(&self.components) + &self.means
+        } else {
+            input.dot(&self.components)
+        };
+        Ok(inverse_transformed)
     }
 
     /// Fits the model with `input`.
@@ -531,7 +553,6 @@ where
             Array1::zeros(input.ncols())
         };
 
-        // TODO: Again, unsure how to unify the type of `input` and `input - &means`
         let (u, sigma, vt, total_variance) = if self.centering {
             let x = input - &means;
             let (u, sigma, vt) = randomized_svd(&x, self.n_components(), &mut self.rng)?;
