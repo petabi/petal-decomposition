@@ -1,3 +1,6 @@
+//! petal-decomposition provides matrix decomposition algorithms including PCA
+//! (principal component analysis) and ICA (independent component analysis).
+
 mod ica;
 mod linalg;
 mod pca;

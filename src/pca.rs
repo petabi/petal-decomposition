@@ -223,6 +223,16 @@ where
 }
 
 /// Builder for [`Pca`].
+///
+/// # Examples
+///
+/// ```
+/// use petal_decomposition::PcaBuilder;
+///
+/// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64]]);
+/// let mut pca = PcaBuilder::new(1).build();
+/// pca.fit(&x);
+/// ```
 #[allow(clippy::module_name_repetitions)]
 pub struct PcaBuilder {
     n_components: usize,
@@ -524,6 +534,16 @@ where
 }
 
 /// Builder for [`RandomizedPca`].
+///
+/// # Examples
+///
+/// ```
+/// use petal_decomposition::RandomizedPcaBuilder;
+///
+/// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64]]);
+/// let mut pca = RandomizedPcaBuilder::new(1).build();
+/// pca.fit(&x);
+/// ```
 pub struct RandomizedPcaBuilder<R> {
     n_components: usize,
     rng: R,
@@ -548,6 +568,16 @@ impl RandomizedPcaBuilder<Pcg> {
     }
 
     /// Initialized the PCG random number genernator with the given seed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use petal_decomposition::RandomizedPcaBuilder;
+    ///
+    /// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64]]);
+    /// let mut pca = RandomizedPcaBuilder::new(1).seed(1234567891011121314).build();
+    /// pca.fit(&x);
+    /// ```
     #[must_use]
     pub fn seed(mut self, seed: u128) -> Self {
         self.rng = Pcg::from_seed(seed.to_be_bytes());
@@ -558,6 +588,16 @@ impl RandomizedPcaBuilder<Pcg> {
     /// enabled by default. If the inputs are already centered, set `centering`
     /// to `false`. *Note* [`Pca::mean()`] will return an [`Array1`] of 0's if
     /// `centering` is `false`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use petal_decomposition::RandomizedPcaBuilder;
+    ///
+    /// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64]]);
+    /// let mut pca = RandomizedPcaBuilder::new(1).centering(false).build();
+    /// pca.fit(&x);
+    /// ```
     #[must_use]
     pub fn centering(mut self, centering: bool) -> Self {
         self.centering = centering;
@@ -570,6 +610,18 @@ impl<R: Rng> RandomizedPcaBuilder<R> {
     ///
     /// The random number generator is used to create a random matrix for
     /// randomized SVD.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use petal_decomposition::RandomizedPcaBuilder;
+    /// use rand_pcg::Pcg64;
+    ///
+    /// let x = ndarray::arr2(&[[0_f64, 0_f64], [1_f64, 1_f64]]);
+    /// let rng = Pcg64::new(0xcafef00dd15ea5e5, 0xa02bdbf7bb3c0a7ac28fa16a64abf96);
+    /// let mut pca = RandomizedPcaBuilder::with_rng(rng, 1).build();
+    /// pca.fit(&x);
+    /// ```
     #[must_use]
     pub fn with_rng(rng: R, n_components: usize) -> Self {
         Self {
