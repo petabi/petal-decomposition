@@ -1,6 +1,6 @@
-use crate::DecompositionError;
+use crate::{linalg::svd, DecompositionError};
 use ndarray::{Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2};
-use ndarray_linalg::{Eigh, Lapack, Scalar, SVD, UPLO};
+use ndarray_linalg::{Eigh, Lapack, Scalar, UPLO};
 use num_traits::FromPrimitive;
 use rand::{Rng, SeedableRng};
 use rand_distr::StandardNormal;
@@ -167,8 +167,7 @@ where
             }
             x
         };
-        let (u, sigma, _) = x.svd(true, false)?;
-        let u = u.expect("`svd` should return `u`");
+        let (u, sigma, _) = svd(&mut x.clone(), false)?;
         let k = unsafe {
             let mut x: Array2<A> = ArrayBase::uninitialized((n_components, u.ncols()));
             for ((u_col, sigma_elem), mut x_row) in u

@@ -1,8 +1,8 @@
-use crate::linalg::{lu_pl, svddc, Lapack};
+use crate::linalg::{lu_pl, svd, svddc, Lapack};
 use crate::DecompositionError;
 use itertools::izip;
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr, ScalarOperand};
-use ndarray_linalg::{error::LinalgError, QRInto, Scalar, SVD};
+use ndarray_linalg::{error::LinalgError, QRInto, Scalar};
 use num_traits::{real::Real, FromPrimitive};
 use rand::{Rng, RngCore, SeedableRng};
 use rand_distr::StandardNormal;
@@ -203,13 +203,12 @@ where
             Array1::zeros(input.ncols())
         };
 
-        let (u, sigma, vt) = if self.centering {
-            (input - &means).svd(true, true)?
+        let (mut u, sigma, vt) = if self.centering {
+            svd(&mut (input - &means), true)?
         } else {
-            input.svd(true, true)?
+            svd(&mut input.to_owned(), true)?
         };
 
-        let mut u = u.expect("`svd` should return `u`");
         let mut vt = vt.expect("`svd` should return `vt`");
         svd_flip(&mut u, &mut vt);
         self.total_variance = sigma.dot(&sigma);

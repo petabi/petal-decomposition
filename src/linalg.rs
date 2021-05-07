@@ -1,5 +1,6 @@
+use crate::DecompositionError;
 use lax::error::Error as LaxError;
-use lax::{layout::MatrixLayout, UVTFlag, SVDDC_};
+use lax::{layout::MatrixLayout, UVTFlag, SVDDC_, SVD_};
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, ShapeBuilder, ShapeError};
 use ndarray_linalg::{c32, c64, Scalar};
 use std::cmp;
@@ -134,14 +135,44 @@ where
     }
 }
 
-pub(crate) type SvdOutput<A> = (Array2<A>, Array1<<A as Scalar>::Real>, Array2<A>);
+pub(crate) type SvdOutput<A> = (Array2<A>, Array1<<A as Scalar>::Real>, Option<Array2<A>>);
+
+/// Calls gesvd.
+pub(crate) fn svd<A, S>(
+    a: &mut ArrayBase<S, Ix2>,
+    calc_vt: bool,
+) -> Result<SvdOutput<A>, DecompositionError>
+where
+    A: SVD_,
+    S: DataMut<Elem = A>,
+{
+    let l = lax_layout(a).map_err(|_| DecompositionError::InvalidInput)?;
+    let nrows = i32::try_from(a.nrows()).expect("doesn't exceed i32::MAX");
+    let ncols = i32::try_from(a.ncols()).expect("doesn't exceed i32::MAX");
+    let output = A::svd(
+        l,
+        true,
+        calc_vt,
+        a.as_slice_memory_order_mut().expect("contiguous"),
+    )
+    .map_err(|_| DecompositionError::InvalidInput)?;
+    let u = vec_into_array(l.resized(nrows, nrows), output.u.expect("`u` requested"))
+        .expect("valid shape");
+    let sigma = ArrayBase::from(output.s);
+    let vt = output
+        .vt
+        .map(|vt| vec_into_array(l.resized(ncols, ncols), vt).expect("valid shape"));
+    Ok((u, sigma, vt))
+}
+
+pub(crate) type SvddcOutput<A> = (Array2<A>, Array1<<A as Scalar>::Real>, Array2<A>);
 
 /// Calls gesdd.
 ///
 /// # Panics
 ///
 /// Panics if `a`'s memory layout is not contiguous.
-pub(crate) fn svddc<A, S>(a: &mut ArrayBase<S, Ix2>) -> Result<SvdOutput<A>, LaxError>
+pub(crate) fn svddc<A, S>(a: &mut ArrayBase<S, Ix2>) -> Result<SvddcOutput<A>, LaxError>
 where
     A: SVDDC_,
     S: DataMut<Elem = A>,
