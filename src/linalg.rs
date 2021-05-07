@@ -1,8 +1,9 @@
 use crate::DecompositionError;
 use lax::error::Error as LaxError;
-use lax::{layout::MatrixLayout, UVTFlag, SVDDC_, SVD_};
+use lax::{layout::MatrixLayout, UVTFlag, QR_, SVDDC_, SVD_};
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, ShapeBuilder, ShapeError};
 use ndarray_linalg::{c32, c64, Scalar};
+use num_traits::Zero;
 use std::cmp;
 use std::convert::TryFrom;
 use std::num::TryFromIntError;
@@ -115,7 +116,6 @@ pub enum LayoutError {
 
 pub(crate) fn lax_layout<A, S>(a: &ArrayBase<S, Ix2>) -> Result<MatrixLayout, LayoutError>
 where
-    A: Scalar,
     S: Data<Elem = A>,
 {
     let nrows = i32::try_from(a.nrows()).map_err(LayoutError::TooManyRows)?;
@@ -194,7 +194,19 @@ where
     Ok((u, sigma, vt))
 }
 
-pub fn vec_into_array<A>(l: MatrixLayout, a: Vec<A>) -> Result<Array2<A>, ShapeError> {
+pub(crate) fn qr<A, S>(mut a: ArrayBase<S, Ix2>) -> Result<Array2<A>, LaxError>
+where
+    A: Copy + QR_ + Zero,
+    S: DataMut<Elem = A>,
+{
+    let l = lax_layout(&a).map_err(|_| LaxError::InvalidShape)?;
+    A::qr(l, a.as_slice_memory_order_mut().expect("contiguous"))?;
+    let k = cmp::min(a.nrows(), a.ncols());
+    let q = a.slice(s![.., ..k]).to_owned();
+    Ok(q)
+}
+
+fn vec_into_array<A>(l: MatrixLayout, a: Vec<A>) -> Result<Array2<A>, ShapeError> {
     match l {
         MatrixLayout::C { row, lda } => Ok(ArrayBase::from_shape_vec(
             (

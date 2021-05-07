@@ -1,8 +1,9 @@
-use crate::linalg::{lu_pl, svd, svddc, Lapack};
+use crate::linalg::{lu_pl, qr, svd, svddc, Lapack};
 use crate::DecompositionError;
 use itertools::izip;
+use lax::error::Error as LaxError;
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr, ScalarOperand};
-use ndarray_linalg::{error::LinalgError, QRInto, Scalar};
+use ndarray_linalg::{error::LinalgError, Scalar};
 use num_traits::{real::Real, FromPrimitive};
 use rand::{Rng, RngCore, SeedableRng};
 use rand_distr::StandardNormal;
@@ -672,7 +673,7 @@ fn randomized_range_finder<A, S, R>(
     size: usize,
     n_iter: usize,
     rng: &mut R,
-) -> Result<Array2<A>, LinalgError>
+) -> Result<Array2<A>, LaxError>
 where
     A: Scalar + Lapack,
     S: Data<Elem = A>,
@@ -693,7 +694,7 @@ where
         pl = q.slice(s![.., 0..cmp::min(q.nrows(), q.ncols())]);
         q = input.dot(&pl);
     }
-    let (q, _) = q.qr_into()?;
+    let q = qr(q)?;
     Ok(q)
 }
 
