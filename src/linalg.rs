@@ -7,6 +7,11 @@ use std::convert::TryFrom;
 use std::num::TryFromIntError;
 
 /// Computes P * L after LU decomposition.
+///
+/// # Panics
+///
+/// * Any dimension of `m` is greater than `i32::MAX`
+/// * `m`'s memory layout is not contiguous
 #[allow(
     clippy::cast_sign_loss,
     clippy::cast_possible_truncation,
@@ -17,7 +22,9 @@ where
     A: Scalar + Lapack,
     S: DataMut<Elem = A>,
 {
-    let mut pivots = unsafe { A::lupiv(lax_layout(m).unwrap(), m.as_slice_mut().unwrap()) }?;
+    let layout = lax_layout(m).unwrap();
+    let a = m.as_slice_memory_order_mut().expect("contiguous");
+    let mut pivots = unsafe { A::lupiv(layout, a) }?;
     if pivots.len() < m.nrows() {
         pivots.extend(pivots.len() as i32 + 1..=m.nrows() as i32);
     }
