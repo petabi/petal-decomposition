@@ -1,8 +1,8 @@
-use crate::linalg::{lu_pl, Lapack};
+use crate::linalg::{lu_pl, svddc, Lapack};
 use crate::DecompositionError;
 use itertools::izip;
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr, ScalarOperand};
-use ndarray_linalg::{error::LinalgError, QRInto, Scalar, UVTFlag, SVD, SVDDC};
+use ndarray_linalg::{error::LinalgError, QRInto, Scalar, SVD};
 use num_traits::{real::Real, FromPrimitive};
 use rand::{Rng, RngCore, SeedableRng};
 use rand_distr::StandardNormal;
@@ -660,10 +660,8 @@ where
 {
     let n_random = n_components + 10; // oversample by 10
     let q = randomized_range_finder(input, n_random, 7, rng)?;
-    let b = q.t().dot(input);
-    let (u, sigma, vt) = b.svddc(UVTFlag::Some)?;
-    let u = u.expect("`svddc` should return `u`");
-    let mut vt = vt.expect("`svddc` should return `vt`");
+    let mut b = q.t().dot(input);
+    let (u, sigma, mut vt) = svddc(&mut b)?;
     let mut u = q.dot(&u);
     svd_flip(&mut u, &mut vt);
     Ok((u, sigma, vt))

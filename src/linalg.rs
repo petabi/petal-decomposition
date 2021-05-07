@@ -1,6 +1,6 @@
 use lax::error::Error as LaxError;
-use lax::layout::MatrixLayout;
-use ndarray::{s, ArrayBase, Axis, Data, DataMut, Ix2};
+use lax::{layout::MatrixLayout, UVTFlag, SVDDC_};
+use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, ShapeBuilder, ShapeError};
 use ndarray_linalg::{c32, c64, Scalar};
 use std::cmp;
 use std::convert::TryFrom;
@@ -131,6 +131,55 @@ where
         })
     } else {
         Err(LayoutError::NotContiguous)
+    }
+}
+
+pub(crate) type SvdOutput<A> = (Array2<A>, Array1<<A as Scalar>::Real>, Array2<A>);
+
+/// Calls gesdd.
+///
+/// # Panics
+///
+/// Panics if `a`'s memory layout is not contiguous.
+pub(crate) fn svddc<A, S>(a: &mut ArrayBase<S, Ix2>) -> Result<SvdOutput<A>, LaxError>
+where
+    A: SVDDC_,
+    S: DataMut<Elem = A>,
+{
+    let l = lax_layout(a).unwrap();
+    let nrows = i32::try_from(a.nrows()).expect("doesn't exceed i32::MAX");
+    let ncols = i32::try_from(a.ncols()).expect("doesn't exceed i32::MAX");
+    let k = cmp::min(nrows, ncols);
+    let output = A::svddc(
+        l,
+        UVTFlag::Some,
+        a.as_slice_memory_order_mut().expect("contiguous"),
+    )?;
+    let u =
+        vec_into_array(l.resized(nrows, k), output.u.expect("`u` requested")).expect("valid shape");
+    let sigma = ArrayBase::from(output.s);
+    let vt = vec_into_array(l.resized(k, ncols), output.vt.expect("vt` requested"))
+        .expect("valid shape");
+    Ok((u, sigma, vt))
+}
+
+pub fn vec_into_array<A>(l: MatrixLayout, a: Vec<A>) -> Result<Array2<A>, ShapeError> {
+    match l {
+        MatrixLayout::C { row, lda } => Ok(ArrayBase::from_shape_vec(
+            (
+                usize::try_from(row).expect("positive"),
+                usize::try_from(lda).expect("positive"),
+            ),
+            a,
+        )?),
+        MatrixLayout::F { col, lda } => Ok(ArrayBase::from_shape_vec(
+            (
+                usize::try_from(lda).expect("positive"),
+                usize::try_from(col).expect("positive"),
+            )
+                .f(),
+            a,
+        )?),
     }
 }
 
