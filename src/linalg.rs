@@ -1,10 +1,12 @@
 use lax::error::Error as LaxError;
 use lax::layout::MatrixLayout;
 use ndarray::{s, ArrayBase, Axis, Data, DataMut, Ix2};
-use ndarray_linalg::{c32, c64, Pivot, Scalar};
+use ndarray_linalg::{c32, c64, Scalar};
 use std::cmp;
 use std::convert::TryFrom;
 use std::num::TryFromIntError;
+
+type Pivot = Vec<i32>;
 
 /// Computes P * L after LU decomposition.
 ///
