@@ -39,13 +39,13 @@ serialization = ["serde", "ndarray/serde", "rand/serde1", "rand_pcg/serde1"]
 
 [dependencies]
 # lax-0.1 conflicts with cauchy>=0.4
-cauchy = "0.3"
+cauchy = ">=0.3, <0.4"
 itertools = "0.10"
 lapacke = "0.3"
 lax = "0.1"
-ndarray = "0.15.1"
-# lax-0.1 conflicts with num-complex>0.4
-num-complex = "0.3"
+ndarray = "0.15"
+# lax-0.1 conflicts with num-complex>=0.4
+num-complex = ">=0.3, <0.4"
 num-traits = "0.2"
 rand = "0.8"
 rand_distr = "0.4"

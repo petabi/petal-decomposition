@@ -9,9 +9,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Requires ndarray 0.15.
 - `DecompisionError::InvalidInput` provides the underlying reason.
 - `DecomposionError::LinalgError` no longer exposes the `ndarray_linalg` error
   type; instead, it provides the underlying reason as `String`.
+- Requires Rust 1.49 or later.
 
 ## [0.5.1] - 2021-05-06
 
