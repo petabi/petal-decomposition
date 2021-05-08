@@ -43,7 +43,7 @@ cauchy = "0.3"
 itertools = "0.10"
 lapacke = "0.3"
 lax = "0.1"
-ndarray = "0.14.0"
+ndarray = "0.15.1"
 # lax-0.1 conflicts with num-complex>0.4
 num-complex = "0.3"
 num-traits = "0.2"
@@ -55,7 +55,7 @@ thiserror = "1"
 
 [dev-dependencies]
 approx = "0.4"
-ndarray = { version = "0.14", features = ["approx"] }
+ndarray = { version = "0.15", features = ["approx"] }
 serde_json = "1"
 
 [packages.metadata.docs.rs]
