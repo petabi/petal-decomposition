@@ -1,9 +1,9 @@
 use crate::{
-    linalg::{self, eigh, svd},
+    linalg::{self, eigh, svd, Lapack},
     DecompositionError,
 };
 use ndarray::{Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2};
-use ndarray_linalg::{Lapack, Scalar};
+use ndarray_linalg::Scalar;
 use num_traits::FromPrimitive;
 use rand::{Rng, SeedableRng};
 use rand_distr::StandardNormal;
@@ -49,7 +49,7 @@ where
 
 impl<A> FastIca<A, Pcg>
 where
-    A: Scalar + Lapack,
+    A: Scalar,
 {
     /// Creates an ICA model with a random seed.
     ///
@@ -78,7 +78,7 @@ where
 
 impl<A, R> FastIca<A, R>
 where
-    A: Scalar + Lapack,
+    A: Scalar,
     R: Rng,
 {
     /// Creates an ICA model with the given random number generator.
@@ -102,6 +102,7 @@ where
     ///   Decomposition routine fails.
     pub fn fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<(), DecompositionError>
     where
+        A: Lapack,
         S: Data<Elem = A>,
     {
         self.inner_fit(input)?;
@@ -146,6 +147,7 @@ where
         input: &ArrayBase<S, Ix2>,
     ) -> Result<Array2<A>, DecompositionError>
     where
+        A: Lapack,
         S: Data<Elem = A>,
     {
         let x = self.inner_fit(input)?;
@@ -162,6 +164,7 @@ where
     ///   Decomposition routine fails.
     fn inner_fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, linalg::Error>
     where
+        A: Lapack,
         S: Data<Elem = A>,
     {
         let n_components = cmp::min(input.nrows(), input.ncols());
@@ -223,7 +226,7 @@ where
 
 impl<A> Default for FastIca<A, Pcg>
 where
-    A: Scalar + Lapack,
+    A: Scalar,
 {
     fn default() -> Self {
         Self::new()

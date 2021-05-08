@@ -88,7 +88,7 @@ where
     Ok(())
 }
 
-pub trait Lapack: ndarray_linalg::Lapack + Sized {
+pub trait Lapack: Eigh_ + QR_ + SVD_ + SVDDC_ + Sized {
     unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Pivot;
 }
 
