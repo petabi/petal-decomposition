@@ -6,15 +6,14 @@ mod linalg;
 mod pca;
 
 pub use ica::{FastIca, FastIcaBuilder};
-use ndarray_linalg::error::LinalgError;
 pub use pca::{Pca, PcaBuilder, RandomizedPca, RandomizedPcaBuilder};
 use thiserror::Error;
 
 /// The error type for PCA operations.
 #[derive(Debug, Error)]
 pub enum DecompositionError {
-    #[error("invalid matrix")]
-    InvalidInput,
-    #[error("linear algerba operation failed")]
-    LinalgError(#[from] LinalgError),
+    #[error("invalid matrix: {0}")]
+    InvalidInput(String),
+    #[error("linear algerba operation failed: {0}")]
+    LinalgError(String),
 }

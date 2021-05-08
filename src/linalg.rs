@@ -1,14 +1,29 @@
 use crate::DecompositionError;
-use lax::error::Error as LaxError;
 use lax::{layout::MatrixLayout, Eigh_, UVTFlag, QR_, SVDDC_, SVD_, UPLO};
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, ShapeBuilder, ShapeError};
 use ndarray_linalg::{c32, c64, Scalar};
 use num_traits::Zero;
 use std::cmp;
 use std::convert::TryFrom;
-use std::num::TryFromIntError;
 
 type Pivot = Vec<i32>;
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum Error {
+    #[error("invalid layout: {0}")]
+    InvalidLayout(#[from] LayoutError),
+    #[error("{0}")]
+    OperationFailure(String),
+}
+
+impl From<Error> for DecompositionError {
+    fn from(e: Error) -> Self {
+        match e {
+            Error::InvalidLayout(e) => DecompositionError::InvalidInput(e.to_string()),
+            Error::OperationFailure(reason) => DecompositionError::LinalgError(reason),
+        }
+    }
+}
 
 /// Computes P * L after LU decomposition.
 ///
@@ -21,14 +36,14 @@ type Pivot = Vec<i32>;
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap
 )]
-pub(crate) fn lu_pl<A, S>(m: &mut ArrayBase<S, Ix2>) -> Result<(), LaxError>
+pub(crate) fn lu_pl<A, S>(m: &mut ArrayBase<S, Ix2>) -> Result<(), LayoutError>
 where
     A: Scalar + Lapack,
     S: DataMut<Elem = A>,
 {
-    let layout = lax_layout(m).unwrap();
+    let layout = lax_layout(m)?;
     let a = m.as_slice_memory_order_mut().expect("contiguous");
-    let mut pivots = unsafe { A::lupiv(layout, a) }?;
+    let mut pivots = unsafe { A::lupiv(layout, a) };
     if pivots.len() < m.nrows() {
         pivots.extend(pivots.len() as i32 + 1..=m.nrows() as i32);
     }
@@ -74,13 +89,13 @@ where
 }
 
 pub trait Lapack: ndarray_linalg::Lapack + Sized {
-    unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Result<Pivot, LaxError>;
+    unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Pivot;
 }
 
 macro_rules! impl_solve {
     ($scalar:ty, $getrf:path) => {
         impl Lapack for $scalar {
-            unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Result<Pivot, LaxError> {
+            unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Pivot {
                 let (row, col) = l.size();
                 let k = ::std::cmp::min(row, col);
                 let mut ipiv = vec![0; k as usize];
@@ -90,9 +105,9 @@ macro_rules! impl_solve {
                 };
                 let info = $getrf(layout, row, col, a, l.lda(), &mut ipiv);
                 if info >= 0 {
-                    Ok(ipiv)
+                    ipiv
                 } else {
-                    Err(LaxError::LapackInvalidValue { return_code: info })
+                    unreachable!("valid getrf parameters")
                 }
             }
         }
@@ -105,21 +120,23 @@ impl_solve!(c64, lapacke::zgetrf);
 impl_solve!(c32, lapacke::cgetrf);
 
 #[derive(Debug, thiserror::Error)]
-pub enum LayoutError {
+pub(crate) enum LayoutError {
     #[error("memory not contiguous")]
     NotContiguous,
     #[error("too many columns: {0}")]
-    TooManyColumns(TryFromIntError),
+    TooManyColumns(String),
     #[error("too many rows: {0}")]
-    TooManyRows(TryFromIntError),
+    TooManyRows(String),
 }
 
 pub(crate) fn lax_layout<A, S>(a: &ArrayBase<S, Ix2>) -> Result<MatrixLayout, LayoutError>
 where
     S: Data<Elem = A>,
 {
-    let nrows = i32::try_from(a.nrows()).map_err(LayoutError::TooManyRows)?;
-    let ncols = i32::try_from(a.ncols()).map_err(LayoutError::TooManyColumns)?;
+    let nrows = i32::try_from(a.nrows())
+        .map_err(|_| LayoutError::TooManyRows(format!("{} > {}", a.nrows(), i32::MAX)))?;
+    let ncols = i32::try_from(a.ncols())
+        .map_err(|_| LayoutError::TooManyColumns(format!("{} > {}", a.ncols(), i32::MAX)))?;
     if nrows as isize == a.stride_of(Axis(1)) {
         Ok(MatrixLayout::F {
             col: ncols,
@@ -135,36 +152,39 @@ where
     }
 }
 
-pub(crate) fn eigh<A, S>(mut a: ArrayBase<S, Ix2>) -> Result<(Array1<A::Real>, Array2<A>), LaxError>
+pub(crate) fn eigh<A, S>(mut a: ArrayBase<S, Ix2>) -> Result<(Array1<A::Real>, Array2<A>), Error>
 where
     A: Eigh_,
     S: DataMut<Elem = A>,
 {
     if !a.is_square() {
-        return Err(LaxError::InvalidShape);
+        let reason = if a.nrows() > a.ncols() {
+            LayoutError::TooManyRows("more rows than columns".to_string())
+        } else {
+            LayoutError::TooManyColumns("more columns than rows".to_string())
+        };
+        return Err(Error::InvalidLayout(reason));
     }
-    let l = lax_layout(&a).map_err(|_| LaxError::InvalidShape)?;
+    let l = lax_layout(&a)?;
     let ev = A::eigh(
         true,
         l,
         UPLO::Lower,
         a.as_slice_memory_order_mut().expect("contiguous"),
-    )?;
+    )
+    .map_err(|_| Error::OperationFailure("cannot compute eigenvalues".to_string()))?;
     Ok((ArrayBase::from(ev), a.to_owned()))
 }
 
 pub(crate) type SvdOutput<A> = (Array2<A>, Array1<<A as Scalar>::Real>, Option<Array2<A>>);
 
 /// Calls gesvd.
-pub(crate) fn svd<A, S>(
-    a: &mut ArrayBase<S, Ix2>,
-    calc_vt: bool,
-) -> Result<SvdOutput<A>, DecompositionError>
+pub(crate) fn svd<A, S>(a: &mut ArrayBase<S, Ix2>, calc_vt: bool) -> Result<SvdOutput<A>, Error>
 where
     A: SVD_,
     S: DataMut<Elem = A>,
 {
-    let l = lax_layout(a).map_err(|_| DecompositionError::InvalidInput)?;
+    let l = lax_layout(a)?;
     let nrows = i32::try_from(a.nrows()).expect("doesn't exceed i32::MAX");
     let ncols = i32::try_from(a.ncols()).expect("doesn't exceed i32::MAX");
     let output = A::svd(
@@ -173,7 +193,7 @@ where
         calc_vt,
         a.as_slice_memory_order_mut().expect("contiguous"),
     )
-    .map_err(|_| DecompositionError::InvalidInput)?;
+    .map_err(|_| Error::OperationFailure("did not converge".to_string()))?;
     let u = vec_into_array(l.resized(nrows, nrows), output.u.expect("`u` requested"))
         .expect("valid shape");
     let sigma = ArrayBase::from(output.s);
@@ -190,12 +210,12 @@ pub(crate) type SvddcOutput<A> = (Array2<A>, Array1<<A as Scalar>::Real>, Array2
 /// # Panics
 ///
 /// Panics if `a`'s memory layout is not contiguous.
-pub(crate) fn svddc<A, S>(a: &mut ArrayBase<S, Ix2>) -> Result<SvddcOutput<A>, LaxError>
+pub(crate) fn svddc<A, S>(a: &mut ArrayBase<S, Ix2>) -> Result<SvddcOutput<A>, Error>
 where
     A: SVDDC_,
     S: DataMut<Elem = A>,
 {
-    let l = lax_layout(a).unwrap();
+    let l = lax_layout(a)?;
     let nrows = i32::try_from(a.nrows()).expect("doesn't exceed i32::MAX");
     let ncols = i32::try_from(a.ncols()).expect("doesn't exceed i32::MAX");
     let k = cmp::min(nrows, ncols);
@@ -203,7 +223,8 @@ where
         l,
         UVTFlag::Some,
         a.as_slice_memory_order_mut().expect("contiguous"),
-    )?;
+    )
+    .map_err(|_| Error::OperationFailure("did not converge".to_string()))?;
     let u =
         vec_into_array(l.resized(nrows, k), output.u.expect("`u` requested")).expect("valid shape");
     let sigma = ArrayBase::from(output.s);
@@ -212,13 +233,13 @@ where
     Ok((u, sigma, vt))
 }
 
-pub(crate) fn qr<A, S>(mut a: ArrayBase<S, Ix2>) -> Result<Array2<A>, LaxError>
+pub(crate) fn qr<A, S>(mut a: ArrayBase<S, Ix2>) -> Result<Array2<A>, LayoutError>
 where
     A: Copy + QR_ + Zero,
     S: DataMut<Elem = A>,
 {
-    let l = lax_layout(&a).map_err(|_| LaxError::InvalidShape)?;
-    A::qr(l, a.as_slice_memory_order_mut().expect("contiguous"))?;
+    let l = lax_layout(&a)?;
+    A::qr(l, a.as_slice_memory_order_mut().expect("contiguous")).expect("valid lapack parameters");
     let k = cmp::min(a.nrows(), a.ncols());
     let q = a.slice(s![.., ..k]).to_owned();
     Ok(q)

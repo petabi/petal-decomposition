@@ -5,6 +5,14 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `DecompisionError::InvalidInput` provides the underlying reason.
+- `DecomposionError::LinalgError` no longer exposes the `ndarray_linalg` error
+  type; instead, it provides the underlying reason as `String`.
+
 ## [0.5.1] - 2021-05-06
 
 ### Added
@@ -77,6 +85,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Principal component analysis (PCA).
 
+[Unreleased]: https://github.com/petabi/petal-decomposition/compare/0.5.1...master
 [0.5.1]: https://github.com/petabi/petal-decomposition/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/petabi/petal-decomposition/compare/0.4.1...0.5.0
 [0.4.1]: https://github.com/petabi/petal-decomposition/compare/0.4.0...0.4.1

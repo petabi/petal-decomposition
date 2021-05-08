@@ -1,9 +1,8 @@
-use crate::linalg::{lu_pl, qr, svd, svddc, Lapack};
+use crate::linalg::{self, lu_pl, qr, svd, svddc, Lapack, LayoutError};
 use crate::DecompositionError;
 use itertools::izip;
-use lax::error::Error as LaxError;
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr, ScalarOperand};
-use ndarray_linalg::{error::LinalgError, Scalar};
+use ndarray_linalg::Scalar;
 use num_traits::{real::Real, FromPrimitive};
 use rand::{Rng, RngCore, SeedableRng};
 use rand_distr::StandardNormal;
@@ -107,9 +106,10 @@ where
     ///
     /// # Errors
     ///
-    /// * `DecompositionError::InvalidInput` if any of the dimensions of `input`
-    ///   is less than the number of components.
-    /// * `DecompositionError::LinalgError` if the underlying Singular Vector
+    /// * [`DecompositionError::InvalidInput`] if any of the dimensions of
+    ///   `input` is less than the number of components, or the layout of
+    ///   `input` is incompatible with LAPACK.
+    /// * [`DecompositionError::LinalgError`] if the underlying Singular Vector
     ///   Decomposition routine fails.
     pub fn fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<(), DecompositionError>
     where
@@ -143,8 +143,11 @@ where
     ///
     /// # Errors
     ///
-    /// Returns `DecompositionError::LinalgError` if the underlying Singular
-    /// Vector Decomposition routine fails.
+    /// * [`DecompositionError::InvalidInput`] if any of the dimensions of
+    ///   `input` is less than the number of components, or the layout of
+    ///   `input` is incompatible with LAPACK.
+    /// * [`DecompositionError::LinalgError`] if the underlying Singular Vector
+    ///   Decomposition routine fails.
     pub fn fit_transform<S>(
         &mut self,
         input: &ArrayBase<S, Ix2>,
@@ -165,7 +168,7 @@ where
     ///
     /// # Errors
     ///
-    /// Returns `DecompositionError::InvalidInput` if the number of rows of
+    /// Returns [`DecompositionError::InvalidInput`] if the number of rows of
     /// `input` is different from that of the training data, or the number of
     /// columns of `input` is different from the number of components.
     pub fn inverse_transform<S>(
@@ -182,16 +185,20 @@ where
     ///
     /// # Errors
     ///
-    /// * `DecompositionError::InvalidInput` if any of the dimensions of `input`
-    ///   is less than the number of components.
-    /// * `DecompositionError::LinalgError` if the underlying Singular Vector
+    /// * [`DecompositionError::InvalidInput`] if any of the dimensions of
+    ///   `input` is less than the number of components, or the layout of
+    ///   `input` is incompatible with LAPACK.
+    /// * [`DecompositionError::LinalgError`] if the underlying Singular Vector
     ///   Decomposition routine fails.
     fn inner_fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, DecompositionError>
     where
         S: Data<Elem = A>,
     {
         if input.shape().iter().any(|v| *v < self.n_components()) {
-            return Err(DecompositionError::InvalidInput);
+            return Err(DecompositionError::InvalidInput(format!(
+                "every dimension should be at least {}",
+                self.n_components()
+            )));
         }
 
         let means = if self.centering {
@@ -413,9 +420,10 @@ where
     ///
     /// # Errors
     ///
-    /// * `DecompositionError::InvalidInput` if any of the dimensions of `input`
-    ///   is less than the number of components.
-    /// * `DecompositionError::LinalgError` if the underlying Singular Vector
+    /// * [`DecompositionError::InvalidInput`] if any of the dimensions of
+    ///   `input` is less than the number of components, or the layout of
+    ///   `input` is incompatible with LAPACK.
+    /// * [`DecompositionError::LinalgError`] if the underlying Singular Vector
     ///   Decomposition routine fails.
     pub fn fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<(), DecompositionError>
     where
@@ -429,7 +437,7 @@ where
     ///
     /// # Errors
     ///
-    /// * `DecompositionError::InvalidInput` if the number of features in
+    /// * [`DecompositionError::InvalidInput`] if the number of features in
     ///   `input` does not match that of the training data.
     pub fn transform<S>(&self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, DecompositionError>
     where
@@ -449,8 +457,11 @@ where
     ///
     /// # Errors
     ///
-    /// Returns `DecompositionError::LinalgError` if the underlying Singular
-    /// Vector Decomposition routine fails.
+    /// * [`DecompositionError::InvalidInput`] if any of the dimensions of
+    ///   `input` is less than the number of components, or the layout of
+    ///   `input` is incompatible with LAPACK.
+    /// * [`DecompositionError::LinalgError`] if the underlying Singular Vector
+    ///   Decomposition routine fails.
     pub fn fit_transform<S>(
         &mut self,
         input: &ArrayBase<S, Ix2>,
@@ -471,7 +482,7 @@ where
     ///
     /// # Errors
     ///
-    /// Returns `DecompositionError::InvalidInput` if the number of rows of
+    /// Returns [`DecompositionError::InvalidInput`] if the number of rows of
     /// `input` is different from that of the training data, or the number of
     /// columns of `input` is different from the number of components.
     pub fn inverse_transform<S>(
@@ -488,16 +499,20 @@ where
     ///
     /// # Errors
     ///
-    /// * `DecompositionError::InvalidInput` if any of the dimensions of `input`
-    ///   is less than the number of components.
-    /// * `DecompositionError::LinalgError` if the underlying Singular Vector
+    /// * [`DecompositionError::InvalidInput`] if any of the dimensions of
+    ///   `input` is less than the number of components, or the layout of
+    ///   `input` is incompatible with LAPACK.
+    /// * [`DecompositionError::LinalgError`] if the underlying Singular Vector
     ///   Decomposition routine fails.
     fn inner_fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, DecompositionError>
     where
         S: Data<Elem = A>,
     {
         if input.shape().iter().any(|v| *v < self.n_components()) {
-            return Err(DecompositionError::InvalidInput);
+            return Err(DecompositionError::InvalidInput(format!(
+                "every dimension should be at least {}",
+                self.n_components()
+            )));
         }
 
         let means = if self.centering {
@@ -652,7 +667,7 @@ fn randomized_svd<A, S, R>(
     input: &ArrayBase<S, Ix2>,
     n_components: usize,
     rng: &mut R,
-) -> Result<Svd<A>, LinalgError>
+) -> Result<Svd<A>, linalg::Error>
 where
     A: Scalar + Lapack,
     S: Data<Elem = A>,
@@ -673,7 +688,7 @@ fn randomized_range_finder<A, S, R>(
     size: usize,
     n_iter: usize,
     rng: &mut R,
-) -> Result<Array2<A>, LaxError>
+) -> Result<Array2<A>, LayoutError>
 where
     A: Scalar + Lapack,
     S: Data<Elem = A>,
@@ -702,8 +717,8 @@ where
 ///
 /// # Errors
 ///
-/// * `DecompositionError::InvalidInput` if the number of features in
-///   `input` does not match that of the training data.
+/// * [`DecompositionError::InvalidInput`] if the number of features in `input`
+///   does not match that of the training data.
 fn transform<A, S>(
     input: &ArrayBase<S, Ix2>,
     components: &Array2<A>,
@@ -715,7 +730,10 @@ where
     S: Data<Elem = A>,
 {
     if input.ncols() != means.len() {
-        return Err(DecompositionError::InvalidInput);
+        return Err(DecompositionError::InvalidInput(format!(
+            "# of columns should be {}",
+            means.len()
+        )));
     }
 
     let transformed = if centering {
@@ -731,7 +749,7 @@ where
 ///
 /// # Errors
 ///
-/// Returns `DecompositionError::LinalgError` if the underlying Singular
+/// Returns [`DecompositionError::LinalgError`] if the underlying Singular
 /// Vector Decomposition routine fails.
 fn transform_with_u<A, S>(
     u: &Array2<A>,
@@ -761,7 +779,7 @@ where
 ///
 /// # Errors
 ///
-/// Returns `DecompositionError::InvalidInput` if the number of rows of
+/// Returns [`DecompositionError::InvalidInput`] if the number of rows of
 /// `input` is different from that of the training data, or the number of
 /// columns of `input` is different from the number of components.
 fn inverse_transform<A, S>(
@@ -775,7 +793,10 @@ where
     S: Data<Elem = A>,
 {
     if input.ncols() != components.nrows() {
-        return Err(DecompositionError::InvalidInput);
+        return Err(DecompositionError::InvalidInput(format!(
+            "# of columns should be {}",
+            components.nrows()
+        )));
     }
 
     let inverse_transformed = if centering {

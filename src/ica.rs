@@ -1,5 +1,5 @@
 use crate::{
-    linalg::{eigh, svd},
+    linalg::{self, eigh, svd},
     DecompositionError,
 };
 use ndarray::{Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2};
@@ -96,7 +96,9 @@ where
     ///
     /// # Errors
     ///
-    /// * `DecompositionError::LinalgError` if the underlying Singular Vector
+    /// * [`DecompositionError::InvalidInput`] if the layout of `input` is
+    ///   incompatible with LAPACK.
+    /// * [`DecompositionError::LinalgError`] if the underlying Singular Vector
     ///   Decomposition routine fails.
     pub fn fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<(), DecompositionError>
     where
@@ -110,14 +112,16 @@ where
     ///
     /// # Errors
     ///
-    /// * `DecompositionError::InvalidInput` if the number of features in
+    /// * [`DecompositionError::InvalidInput`] if the number of features in
     ///   `input` does not match that of the training data.
     pub fn transform<S>(&self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, DecompositionError>
     where
         S: Data<Elem = A>,
     {
         if input.ncols() != self.means.len() {
-            return Err(DecompositionError::InvalidInput);
+            return Err(DecompositionError::InvalidInput(
+                "too many columns".to_string(),
+            ));
         }
         let x = input - &self.means;
         Ok(x.dot(&self.components.t()))
@@ -133,8 +137,10 @@ where
     ///
     /// # Errors
     ///
-    /// Returns `DecompositionError::LinalgError` if the underlying Singular
-    /// Vector Decomposition routine fails.
+    /// * [`DecompositionError::InvalidInput`] if the layout of `input` is
+    ///   incompatible with LAPACK.
+    /// * [`DecompositionError::LinalgError`] if the underlying Singular Vector
+    ///   Decomposition routine fails.
     pub fn fit_transform<S>(
         &mut self,
         input: &ArrayBase<S, Ix2>,
@@ -146,7 +152,15 @@ where
         Ok(self.components.dot(&x).t().to_owned())
     }
 
-    fn inner_fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, DecompositionError>
+    /// Fits the model with `input`.
+    ///
+    /// # Errors
+    ///
+    /// * [`DecompositionError::InvalidInput`] if the layout of `input` is
+    ///   incompatible with LAPACK.
+    /// * [`DecompositionError::LinalgError`] if the underlying Singular Vector
+    ///   Decomposition routine fails.
+    fn inner_fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, linalg::Error>
     where
         S: Data<Elem = A>,
     {
