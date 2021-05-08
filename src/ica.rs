@@ -1,6 +1,9 @@
-use crate::{linalg::svd, DecompositionError};
+use crate::{
+    linalg::{eigh, svd},
+    DecompositionError,
+};
 use ndarray::{Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2};
-use ndarray_linalg::{Eigh, Lapack, Scalar, UPLO};
+use ndarray_linalg::{Lapack, Scalar};
 use num_traits::FromPrimitive;
 use rand::{Rng, SeedableRng};
 use rand_distr::StandardNormal;
@@ -348,7 +351,7 @@ where
     A: Scalar + Lapack,
     S: Data<Elem = A>,
 {
-    let (e, mut v) = input.dot(&input.t()).eigh(UPLO::Lower).unwrap();
+    let (e, mut v) = eigh(input.dot(&input.t())).unwrap();
     let v_t = v.t().to_owned();
     let e_sqrt_inv: Array1<A> = e
         .iter()

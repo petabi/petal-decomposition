@@ -1,6 +1,6 @@
 use crate::DecompositionError;
 use lax::error::Error as LaxError;
-use lax::{layout::MatrixLayout, UVTFlag, QR_, SVDDC_, SVD_};
+use lax::{layout::MatrixLayout, Eigh_, UVTFlag, QR_, SVDDC_, SVD_, UPLO};
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, ShapeBuilder, ShapeError};
 use ndarray_linalg::{c32, c64, Scalar};
 use num_traits::Zero;
@@ -133,6 +133,24 @@ where
     } else {
         Err(LayoutError::NotContiguous)
     }
+}
+
+pub(crate) fn eigh<A, S>(mut a: ArrayBase<S, Ix2>) -> Result<(Array1<A::Real>, Array2<A>), LaxError>
+where
+    A: Eigh_,
+    S: DataMut<Elem = A>,
+{
+    if !a.is_square() {
+        return Err(LaxError::InvalidShape);
+    }
+    let l = lax_layout(&a).map_err(|_| LaxError::InvalidShape)?;
+    let ev = A::eigh(
+        true,
+        l,
+        UPLO::Lower,
+        a.as_slice_memory_order_mut().expect("contiguous"),
+    )?;
+    Ok((ArrayBase::from(ev), a.to_owned()))
 }
 
 pub(crate) type SvdOutput<A> = (Array2<A>, Array1<<A as Scalar>::Real>, Option<Array2<A>>);
