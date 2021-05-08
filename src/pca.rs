@@ -2,7 +2,7 @@ use crate::linalg::{self, lu_pl, qr, svd, svddc, Lapack, LayoutError};
 use crate::DecompositionError;
 use cauchy::Scalar;
 use itertools::izip;
-use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr, ScalarOperand};
+use ndarray::{s, Array1, Array2, ArrayBase, AssignElem, Axis, Data, Ix2, ScalarOperand};
 use num_traits::{real::Real, FromPrimitive};
 use rand::{Rng, RngCore, SeedableRng};
 use rand_distr::StandardNormal;
@@ -761,18 +761,17 @@ where
     A: Scalar,
     S: Data<Elem = A>,
 {
-    let mut y: ArrayBase<OwnedRepr<A>, Ix2> = // initialized in the following `for` loop
-        unsafe { ArrayBase::uninitialized((input.nrows(), n_components)) };
+    let mut y = Array2::<A>::uninit((input.nrows(), n_components));
     for (y_row, u_row) in y
         .lanes_mut(Axis(1))
         .into_iter()
         .zip(u.slice(s![.., 0..n_components]).lanes(Axis(1)))
     {
         for (y_v, u_v, sigma_v) in izip!(y_row.into_iter(), u_row, singular) {
-            *y_v = *u_v * A::from_real(*sigma_v);
+            y_v.assign_elem(*u_v * A::from_real(*sigma_v));
         }
     }
-    y
+    unsafe { y.assume_init() }
 }
 
 /// Transforms data back to its original space.
@@ -848,7 +847,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use approx::{assert_abs_diff_eq, assert_relative_eq, AbsDiffEq};
+    use approx::{assert_abs_diff_eq, assert_relative_eq};
     use ndarray::{arr2, Array2};
     use rand::Rng;
     use rand_distr::StandardNormal;
@@ -932,7 +931,6 @@ mod test {
     #[test]
     #[cfg(feature = "serde")]
     fn pca_serialize() {
-        use approx::AbsDiffEq;
         let mut pca = super::Pca::new(1);
         let x = arr2(&[[1_f32, 1_f32]]);
         assert!(pca.fit(&x).is_ok());
@@ -1027,7 +1025,6 @@ mod test {
     #[test]
     #[cfg(feature = "serde")]
     fn randomized_pca_serialize() {
-        use approx::AbsDiffEq;
         let mut pca = super::RandomizedPca::with_seed(1, RNG_SEED);
         let x = arr2(&[[1_f32, 1_f32]]);
         assert!(pca.fit(&x).is_ok());

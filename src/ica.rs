@@ -3,7 +3,7 @@ use crate::{
     DecompositionError,
 };
 use cauchy::Scalar;
-use ndarray::{Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2};
+use ndarray::{Array1, Array2, ArrayBase, AssignElem, Axis, Data, DataMut, Ix2};
 use num_traits::FromPrimitive;
 use rand::{Rng, SeedableRng};
 use rand_distr::StandardNormal;
@@ -174,36 +174,32 @@ where
             return Ok(Array2::<A>::zeros((0, input.ncols())));
         };
         let n_features = input.nrows();
-        let x = unsafe {
-            let mut x: Array2<A> = ArrayBase::uninitialized((input.ncols(), input.nrows()));
-            for (mut x_row, (input_col, col_mean)) in x
-                .lanes_mut(Axis(1))
-                .into_iter()
-                .zip(input.lanes(Axis(0)).into_iter().zip(means.iter()))
-            {
-                for (x_elem, input_elem) in x_row.iter_mut().zip(input_col.iter()) {
-                    *x_elem = *input_elem - *col_mean;
-                }
+        let mut x = Array2::<A>::uninit((input.ncols(), input.nrows()));
+        for (mut x_row, (input_col, col_mean)) in x
+            .lanes_mut(Axis(1))
+            .into_iter()
+            .zip(input.lanes(Axis(0)).into_iter().zip(means.iter()))
+        {
+            for (x_elem, input_elem) in x_row.iter_mut().zip(input_col.iter()) {
+                x_elem.assign_elem(*input_elem - *col_mean);
             }
-            x
-        };
+        }
+        let x = unsafe { x.assume_init() };
         let (u, sigma, _) = svd(&mut x.clone(), false)?;
-        let k = unsafe {
-            let mut x: Array2<A> = ArrayBase::uninitialized((n_components, u.ncols()));
-            for ((u_col, sigma_elem), mut x_row) in u
-                .lanes(Axis(0))
-                .into_iter()
-                .zip(sigma.into_iter())
-                .take(n_components)
-                .zip(x.lanes_mut(Axis(1)).into_iter())
-            {
-                let d = A::from_real(*sigma_elem);
-                for (u_elem, x_elem) in u_col.iter().take(n_components).zip(x_row.iter_mut()) {
-                    *x_elem = *u_elem / d;
-                }
+        let mut k = Array2::<A>::uninit((n_components, u.ncols()));
+        for ((u_col, sigma_elem), mut k_row) in u
+            .lanes(Axis(0))
+            .into_iter()
+            .zip(sigma.into_iter())
+            .take(n_components)
+            .zip(k.lanes_mut(Axis(1)).into_iter())
+        {
+            let d = A::from_real(*sigma_elem);
+            for (u_elem, k_elem) in u_col.iter().take(n_components).zip(k_row.iter_mut()) {
+                k_elem.assign_elem(*u_elem / d);
             }
-            x
-        };
+        }
+        let k = unsafe { k.assume_init() };
         let mut x1 = k.dot(&x);
         let n_features_sqrt = A::from_usize(n_features).expect("approximation").sqrt();
         for x_elem in x1.iter_mut() {
@@ -424,7 +420,6 @@ mod test {
     #[test]
     #[cfg(feature = "serde")]
     fn fast_ica_serialize() {
-        use approx::AbsDiffEq;
         let x = arr2(&[[0., 0.], [1., 1.], [1., -1.]]);
         let mut ica = super::FastIca::new();
         assert!(ica.fit(&x).is_ok());
