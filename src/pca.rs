@@ -1,8 +1,8 @@
 use crate::linalg::{self, lu_pl, qr, svd, svddc, Lapack, LayoutError};
 use crate::DecompositionError;
+use cauchy::Scalar;
 use itertools::izip;
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, Ix2, OwnedRepr, ScalarOperand};
-use ndarray_linalg::Scalar;
 use num_traits::{real::Real, FromPrimitive};
 use rand::{Rng, RngCore, SeedableRng};
 use rand_distr::StandardNormal;

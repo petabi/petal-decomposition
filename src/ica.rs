@@ -2,8 +2,8 @@ use crate::{
     linalg::{self, eigh, svd, Lapack},
     DecompositionError,
 };
+use cauchy::Scalar;
 use ndarray::{Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2};
-use ndarray_linalg::Scalar;
 use num_traits::FromPrimitive;
 use rand::{Rng, SeedableRng};
 use rand_distr::StandardNormal;

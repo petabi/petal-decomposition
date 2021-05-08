@@ -1,7 +1,8 @@
 use crate::DecompositionError;
+use cauchy::Scalar;
 use lax::{layout::MatrixLayout, Eigh_, UVTFlag, QR_, SVDDC_, SVD_, UPLO};
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, ShapeBuilder, ShapeError};
-use ndarray_linalg::{c32, c64, Scalar};
+use num_complex::{Complex32, Complex64};
 use num_traits::Zero;
 use std::cmp;
 use std::convert::TryFrom;
@@ -116,8 +117,8 @@ macro_rules! impl_solve {
 
 impl_solve!(f64, lapacke::dgetrf);
 impl_solve!(f32, lapacke::sgetrf);
-impl_solve!(c64, lapacke::zgetrf);
-impl_solve!(c32, lapacke::cgetrf);
+impl_solve!(Complex64, lapacke::zgetrf);
+impl_solve!(Complex32, lapacke::cgetrf);
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum LayoutError {
@@ -181,7 +182,7 @@ pub(crate) type SvdOutput<A> = (Array2<A>, Array1<<A as Scalar>::Real>, Option<A
 /// Calls gesvd.
 pub(crate) fn svd<A, S>(a: &mut ArrayBase<S, Ix2>, calc_vt: bool) -> Result<SvdOutput<A>, Error>
 where
-    A: SVD_,
+    A: Scalar + SVD_,
     S: DataMut<Elem = A>,
 {
     let l = lax_layout(a)?;
@@ -212,7 +213,7 @@ pub(crate) type SvddcOutput<A> = (Array2<A>, Array1<<A as Scalar>::Real>, Array2
 /// Panics if `a`'s memory layout is not contiguous.
 pub(crate) fn svddc<A, S>(a: &mut ArrayBase<S, Ix2>) -> Result<SvddcOutput<A>, Error>
 where
-    A: SVDDC_,
+    A: Scalar + SVDDC_,
     S: DataMut<Elem = A>,
 {
     let l = lax_layout(a)?;

@@ -22,27 +22,30 @@ codecov = { repository = "petabi/petal-decomposition", service = "github" }
 no-default-features = true
 
 [features]
-netlib    = ["lax/netlib", "ndarray-linalg/netlib"]
-openblas  = ["lax/openblas", "ndarray-linalg/openblas"]
-intel-mkl = ["lax/intel-mkl", "ndarray-linalg/intel-mkl"]
+netlib    = ["lax/netlib"]
+openblas  = ["lax/openblas"]
+intel-mkl = ["lax/intel-mkl"]
 
-netlib-static   = ["lax/netlib-static", "ndarray-linalg/netlib-static"]
-netlib-system   = ["lax/netlib-system", "ndarray-linalg/netlib-system"]
+netlib-static   = ["lax/netlib-static"]
+netlib-system   = ["lax/netlib-system"]
 
-openblas-static = ["lax/openblas-static", "ndarray-linalg/openblas-static"]
-openblas-system = ["lax/openblas-system", "ndarray-linalg/openblas-system"]
+openblas-static = ["lax/openblas-static"]
+openblas-system = ["lax/openblas-system"]
 
-intel-mkl-static = ["lax/intel-mkl-static", "ndarray-linalg/intel-mkl-static"]
-intel-mkl-system = ["lax/intel-mkl-system", "ndarray-linalg/intel-mkl-system"]
+intel-mkl-static = ["lax/intel-mkl-static"]
+intel-mkl-system = ["lax/intel-mkl-system"]
 
 serialization = ["serde", "ndarray/serde", "rand/serde1", "rand_pcg/serde1"]
 
 [dependencies]
+# lax-0.1 conflicts with cauchy>=0.4
+cauchy = "0.3"
 itertools = "0.10"
 lapacke = "0.3"
 lax = "0.1"
 ndarray = "0.14.0"
-ndarray-linalg = "0.13"
+# lax-0.1 conflicts with num-complex>0.4
+num-complex = "0.3"
 num-traits = "0.2"
 rand = "0.8"
 rand_distr = "0.4"
