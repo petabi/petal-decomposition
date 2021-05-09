@@ -1,6 +1,9 @@
+mod lapack;
+
+use crate::linalg::lapack::Lapack;
 use crate::DecompositionError;
 use cauchy::Scalar;
-use lax::{layout::MatrixLayout, Eigh_, UVTFlag, QR_, SVDDC_, SVD_, UPLO};
+use lax::{layout::MatrixLayout, UVTFlag, QR_, SVDDC_, SVD_};
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, ShapeBuilder, ShapeError};
 use num_complex::{Complex32, Complex64};
 use num_traits::Zero;
@@ -39,7 +42,7 @@ impl From<Error> for DecompositionError {
 )]
 pub(crate) fn lu_pl<A, S>(m: &mut ArrayBase<S, Ix2>) -> Result<(), LayoutError>
 where
-    A: Scalar + Lapack,
+    A: Scalar + LuPiv,
     S: DataMut<Elem = A>,
 {
     let layout = lax_layout(m)?;
@@ -89,13 +92,13 @@ where
     Ok(())
 }
 
-pub trait Lapack: Eigh_ + QR_ + SVD_ + SVDDC_ + Sized {
+pub trait LuPiv: Lapack + QR_ + SVD_ + SVDDC_ + Sized {
     unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Pivot;
 }
 
 macro_rules! impl_solve {
     ($scalar:ty, $getrf:path) => {
-        impl Lapack for $scalar {
+        impl LuPiv for $scalar {
             unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Pivot {
                 let (row, col) = l.size();
                 let k = ::std::cmp::min(row, col);
@@ -155,7 +158,7 @@ where
 
 pub(crate) fn eigh<A, S>(mut a: ArrayBase<S, Ix2>) -> Result<(Array1<A::Real>, Array2<A>), Error>
 where
-    A: Eigh_,
+    A: Lapack,
     S: DataMut<Elem = A>,
 {
     if !a.is_square() {
@@ -166,14 +169,13 @@ where
         };
         return Err(Error::InvalidLayout(reason));
     }
-    let l = lax_layout(&a)?;
-    let ev = A::eigh(
-        true,
-        l,
-        UPLO::Lower,
-        a.as_slice_memory_order_mut().expect("contiguous"),
-    )
-    .map_err(|_| Error::OperationFailure("cannot compute eigenvalues".to_string()))?;
+    let n = i32::try_from(a.nrows())
+        .map_err(|_| LayoutError::TooManyRows(format!("{} > {}", a.nrows(), i32::MAX)))?;
+    let a_ptr = a
+        .as_slice_memory_order_mut()
+        .ok_or(LayoutError::NotContiguous)?;
+    let ev = unsafe { A::heev(b'V', b'L', n, a_ptr, n) }
+        .map_err(|_| Error::OperationFailure("cannot compute eigenvalues".to_string()))?;
     Ok((ArrayBase::from(ev), a.to_owned()))
 }
 

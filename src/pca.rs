@@ -1,4 +1,4 @@
-use crate::linalg::{self, lu_pl, qr, svd, svddc, Lapack, LayoutError};
+use crate::linalg::{self, lu_pl, qr, svd, svddc, LayoutError, LuPiv};
 use crate::DecompositionError;
 use cauchy::Scalar;
 use itertools::izip;
@@ -68,7 +68,7 @@ where
 
 impl<A> Pca<A>
 where
-    A: Scalar + Lapack,
+    A: Scalar + LuPiv,
     A::Real: ScalarOperand,
 {
     /// Returns the principal axes in feature space.
@@ -381,7 +381,7 @@ where
 
 impl<A, R> RandomizedPca<A, R>
 where
-    A: Scalar + Lapack,
+    A: Scalar + LuPiv,
     A::Real: ScalarOperand,
     R: Rng,
 {
@@ -669,7 +669,7 @@ fn randomized_svd<A, S, R>(
     rng: &mut R,
 ) -> Result<Svd<A>, linalg::Error>
 where
-    A: Scalar + Lapack,
+    A: Scalar + LuPiv,
     S: Data<Elem = A>,
     R: RngCore,
 {
@@ -690,7 +690,7 @@ fn randomized_range_finder<A, S, R>(
     rng: &mut R,
 ) -> Result<Array2<A>, LayoutError>
 where
-    A: Scalar + Lapack,
+    A: Scalar + LuPiv,
     S: Data<Elem = A>,
     R: RngCore,
 {

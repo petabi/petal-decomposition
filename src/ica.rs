@@ -1,5 +1,5 @@
 use crate::{
-    linalg::{self, eigh, svd, Lapack},
+    linalg::{self, eigh, svd, LuPiv},
     DecompositionError,
 };
 use cauchy::Scalar;
@@ -102,7 +102,7 @@ where
     ///   Decomposition routine fails.
     pub fn fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<(), DecompositionError>
     where
-        A: Lapack,
+        A: LuPiv,
         S: Data<Elem = A>,
     {
         self.inner_fit(input)?;
@@ -147,7 +147,7 @@ where
         input: &ArrayBase<S, Ix2>,
     ) -> Result<Array2<A>, DecompositionError>
     where
-        A: Lapack,
+        A: LuPiv,
         S: Data<Elem = A>,
     {
         let x = self.inner_fit(input)?;
@@ -164,7 +164,7 @@ where
     ///   Decomposition routine fails.
     fn inner_fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, linalg::Error>
     where
-        A: Lapack,
+        A: LuPiv,
         S: Data<Elem = A>,
     {
         let n_components = cmp::min(input.nrows(), input.ncols());
@@ -322,7 +322,7 @@ fn ica_par<A, S>(
     w_init: &ArrayBase<S, Ix2>,
 ) -> (Array2<A>, usize)
 where
-    A: Scalar + Lapack,
+    A: Scalar + LuPiv,
     S: Data<Elem = A>,
 {
     let mut w = symmetric_decorrelation(w_init);
@@ -361,7 +361,7 @@ where
 
 fn symmetric_decorrelation<A, S>(input: &ArrayBase<S, Ix2>) -> Array2<A>
 where
-    A: Scalar + Lapack,
+    A: Scalar + LuPiv,
     S: Data<Elem = A>,
 {
     let (e, mut v) = eigh(input.dot(&input.t())).unwrap();
