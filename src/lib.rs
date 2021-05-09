@@ -1,6 +1,15 @@
 //! petal-decomposition provides matrix decomposition algorithms including PCA
 //! (principal component analysis) and ICA (independent component analysis).
 
+#[cfg(any(feature = "intel-mkl-static", feature = "intel-mkl-system"))]
+extern crate intel_mkl_src as _src;
+
+#[cfg(any(feature = "netlib_static", feature = "netlib-system"))]
+extern crate netlib_src as _src;
+
+#[cfg(any(feature = "openblas-static", feature = "openblas-system"))]
+extern crate openblas_src as _src;
+
 mod ica;
 mod linalg;
 mod pca;
