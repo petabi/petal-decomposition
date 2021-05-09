@@ -3,10 +3,9 @@ mod lapack;
 use crate::linalg::lapack::Lapack;
 use crate::DecompositionError;
 use cauchy::Scalar;
-use lax::{layout::MatrixLayout, UVTFlag, QR_, SVDDC_, SVD_};
+use lax::{layout::MatrixLayout, UVTFlag, SVDDC_, SVD_};
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, ShapeBuilder, ShapeError};
 use num_complex::{Complex32, Complex64};
-use num_traits::Zero;
 use std::cmp;
 use std::convert::TryFrom;
 
@@ -92,7 +91,7 @@ where
     Ok(())
 }
 
-pub trait LuPiv: Lapack + QR_ + SVD_ + SVDDC_ + Sized {
+pub trait LuPiv: Lapack + SVD_ + SVDDC_ + Sized {
     unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Pivot;
 }
 
@@ -236,15 +235,28 @@ where
     Ok((u, sigma, vt))
 }
 
+/// # Panics
+///
+/// Panics if `a` is not in the standard layout.
 pub(crate) fn qr<A, S>(mut a: ArrayBase<S, Ix2>) -> Result<Array2<A>, LayoutError>
 where
-    A: Copy + QR_ + Zero,
+    A: Lapack,
     S: DataMut<Elem = A>,
 {
-    let l = lax_layout(&a)?;
-    A::qr(l, a.as_slice_memory_order_mut().expect("contiguous")).expect("valid lapack parameters");
-    let k = cmp::min(a.nrows(), a.ncols());
-    let q = a.slice(s![.., ..k]).to_owned();
+    assert!(a.is_standard_layout());
+    let nrows = i32::try_from(a.nrows())
+        .map_err(|_| LayoutError::TooManyRows(format!("{} > {}", a.nrows(), i32::MAX)))?;
+    let ncols = i32::try_from(a.ncols())
+        .map_err(|_| LayoutError::TooManyColumns(format!("{} > {}", a.ncols(), i32::MAX)))?;
+    let a_ptr = a
+        .as_slice_memory_order_mut()
+        .ok_or(LayoutError::NotContiguous)?;
+    let tau = unsafe { A::gelqf(ncols, nrows, a_ptr, ncols) }.expect("valid lapack parameters");
+    let k = cmp::min(nrows, ncols);
+    unsafe { A::unglq(k, nrows, k, a_ptr, ncols, &tau) }.expect("valid lapack parameters");
+    let q = a
+        .slice(s![.., ..usize::try_from(k).expect("valid usize")])
+        .to_owned();
     Ok(q)
 }
 
