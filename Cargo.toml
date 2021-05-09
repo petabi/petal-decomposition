@@ -22,38 +22,53 @@ codecov = { repository = "petabi/petal-decomposition", service = "github" }
 no-default-features = true
 
 [features]
-netlib    = ["lax/netlib"]
-openblas  = ["lax/openblas"]
-intel-mkl = ["lax/intel-mkl"]
+default = []
 
-netlib-static   = ["lax/netlib-static"]
-netlib-system   = ["lax/netlib-system"]
+intel-mkl = ["intel-mkl-static"]
+netlib    = ["netlib-static"]
+openblas  = ["openblas-static"]
 
-openblas-static = ["lax/openblas-static"]
-openblas-system = ["lax/openblas-system"]
+intel-mkl-static = ["intel-mkl-src/mkl-static-lp64-seq", "intel-mkl-src/download"]
+intel-mkl-system = ["intel-mkl-src/mkl-dynamic-lp64-seq"]
 
-intel-mkl-static = ["lax/intel-mkl-static"]
-intel-mkl-system = ["lax/intel-mkl-system"]
+netlib-static   = ["netlib-src/static"]
+netlib-system   = ["netlib-src/system"]
+
+openblas-static = ["openblas-src/static"]
+openblas-system = ["openblas-src/system"]
 
 serialization = ["serde", "ndarray/serde", "rand/serde1", "rand_pcg/serde1"]
 
 [dependencies]
-# lax-0.1 conflicts with cauchy>=0.4
-cauchy = ">=0.3, <0.4"
+cauchy = "0.4"
 itertools = "0.10"
-# lax-0.1 requires lapack 0.17.*
-lapack = "~0.17"
+lapack = "0.19"
 lapacke = "0.5"
-lax = "0.1"
 ndarray = "0.15"
-# lax-0.1 conflicts with num-complex>=0.4
-num-complex = ">=0.3, <0.4"
+num-complex = "0.4"
 num-traits = "0.2"
 rand = "0.8"
 rand_distr = "0.4"
 rand_pcg = "0.3"
 serde = { version = "1", features = ["derive"], optional = true }
 thiserror = "1"
+
+[dependencies.intel-mkl-src]
+version = "0.6"
+default-features = false
+optional = true
+
+[dependencies.netlib-src]
+version = "0.8"
+default-features = false
+features = ["cblas"]
+optional = true
+
+[dependencies.openblas-src]
+version = "0.10.4"
+default-features = false
+features = ["cblas"]
+optional = true
 
 [dev-dependencies]
 approx = "0.4"

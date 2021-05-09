@@ -3,8 +3,7 @@ mod lapack;
 use crate::linalg::lapack::Lapack;
 use crate::DecompositionError;
 use cauchy::Scalar;
-use lax::layout::MatrixLayout;
-use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2};
+use ndarray::{s, Array1, Array2, ArrayBase, DataMut, Ix2};
 use num_complex::{Complex32, Complex64};
 use std::cmp;
 use std::convert::TryFrom;
@@ -33,22 +32,28 @@ impl From<Error> for DecompositionError {
 /// # Panics
 ///
 /// * Any dimension of `m` is greater than `i32::MAX`
-/// * `m`'s memory layout is not contiguous
+/// * `m`'s memory layout is not contiguous or not in the standard layout.
 #[allow(
     clippy::cast_sign_loss,
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap
 )]
-pub(crate) fn lu_pl<A, S>(m: &mut ArrayBase<S, Ix2>) -> Result<(), LayoutError>
+pub(crate) fn lu_pl<A, S>(a: &mut ArrayBase<S, Ix2>) -> Result<(), LayoutError>
 where
     A: Scalar + LuPiv,
     S: DataMut<Elem = A>,
 {
-    let layout = lax_layout(m)?;
-    let a = m.as_slice_memory_order_mut().expect("contiguous");
-    let mut pivots = unsafe { A::lupiv(layout, a) };
-    if pivots.len() < m.nrows() {
-        pivots.extend(pivots.len() as i32 + 1..=m.nrows() as i32);
+    assert!(a.is_standard_layout());
+    let nrows = i32::try_from(a.nrows())
+        .map_err(|_| LayoutError::TooManyRows(format!("{} > {}", a.nrows(), i32::MAX)))?;
+    let ncols = i32::try_from(a.ncols())
+        .map_err(|_| LayoutError::TooManyColumns(format!("{} > {}", a.ncols(), i32::MAX)))?;
+    let a_ptr = a
+        .as_slice_memory_order_mut()
+        .ok_or(LayoutError::NotContiguous)?;
+    let mut pivots = unsafe { A::lupiv(nrows, ncols, a_ptr) };
+    if pivots.len() < a.nrows() {
+        pivots.extend(pivots.len() as i32 + 1..=a.nrows() as i32);
     }
     for i in (0..pivots.len()).rev() {
         pivots[i] -= 1;
@@ -60,7 +65,7 @@ where
         pivots[target] = i as i32;
     }
 
-    let mut pl = m.slice_mut(s![.., 0..cmp::min(m.nrows(), m.ncols())]);
+    let mut pl = a.slice_mut(s![.., 0..cmp::min(a.nrows(), a.ncols())]);
     let mut dst = 0;
     let mut i = dst;
     loop {
@@ -92,21 +97,16 @@ where
 }
 
 pub trait LuPiv: Lapack + Sized {
-    unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Pivot;
+    unsafe fn lupiv(m: i32, n: i32, a: &mut [Self]) -> Pivot;
 }
 
 macro_rules! impl_solve {
     ($scalar:ty, $getrf:path) => {
         impl LuPiv for $scalar {
-            unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Pivot {
-                let (row, col) = l.size();
-                let k = ::std::cmp::min(row, col);
+            unsafe fn lupiv(m: i32, n: i32, a: &mut [Self]) -> Pivot {
+                let k = ::std::cmp::min(m, n);
                 let mut ipiv = vec![0; k as usize];
-                let layout = match l {
-                    MatrixLayout::C { .. } => lapacke::Layout::RowMajor,
-                    MatrixLayout::F { .. } => lapacke::Layout::ColumnMajor,
-                };
-                let info = $getrf(layout, row, col, a, l.lda(), &mut ipiv);
+                let info = $getrf(lapacke::Layout::RowMajor, m, n, a, n, &mut ipiv);
                 if info >= 0 {
                     ipiv
                 } else {
@@ -130,29 +130,6 @@ pub(crate) enum LayoutError {
     TooManyColumns(String),
     #[error("too many rows: {0}")]
     TooManyRows(String),
-}
-
-pub(crate) fn lax_layout<A, S>(a: &ArrayBase<S, Ix2>) -> Result<MatrixLayout, LayoutError>
-where
-    S: Data<Elem = A>,
-{
-    let nrows = i32::try_from(a.nrows())
-        .map_err(|_| LayoutError::TooManyRows(format!("{} > {}", a.nrows(), i32::MAX)))?;
-    let ncols = i32::try_from(a.ncols())
-        .map_err(|_| LayoutError::TooManyColumns(format!("{} > {}", a.ncols(), i32::MAX)))?;
-    if nrows as isize == a.stride_of(Axis(1)) {
-        Ok(MatrixLayout::F {
-            col: ncols,
-            lda: nrows,
-        })
-    } else if ncols as isize == a.stride_of(Axis(0)) {
-        Ok(MatrixLayout::C {
-            row: nrows,
-            lda: ncols,
-        })
-    } else {
-        Err(LayoutError::NotContiguous)
-    }
 }
 
 pub(crate) fn eigh<A, S>(mut a: ArrayBase<S, Ix2>) -> Result<(Array1<A::Real>, Array2<A>), Error>
