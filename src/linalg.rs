@@ -3,8 +3,8 @@ mod lapack;
 use crate::linalg::lapack::Lapack;
 use crate::DecompositionError;
 use cauchy::Scalar;
-use lax::{layout::MatrixLayout, UVTFlag, SVDDC_};
-use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, ShapeBuilder, ShapeError};
+use lax::layout::MatrixLayout;
+use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2};
 use num_complex::{Complex32, Complex64};
 use std::cmp;
 use std::convert::TryFrom;
@@ -91,7 +91,7 @@ where
     Ok(())
 }
 
-pub trait LuPiv: Lapack + SVDDC_ + Sized {
+pub trait LuPiv: Lapack + Sized {
     unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Pivot;
 }
 
@@ -215,26 +215,27 @@ pub(crate) type SvddcOutput<A> = (Array2<A>, Array1<<A as Scalar>::Real>, Array2
 ///
 /// # Panics
 ///
-/// Panics if `a`'s memory layout is not contiguous.
+/// Panics if `a`'s memory layout is not contiguous or not in the standard
+/// layout.
 pub(crate) fn svddc<A, S>(a: &mut ArrayBase<S, Ix2>) -> Result<SvddcOutput<A>, Error>
 where
-    A: Scalar + SVDDC_,
+    A: Lapack,
     S: DataMut<Elem = A>,
 {
-    let l = lax_layout(a)?;
-    let nrows = i32::try_from(a.nrows()).expect("doesn't exceed i32::MAX");
-    let ncols = i32::try_from(a.ncols()).expect("doesn't exceed i32::MAX");
-    let k = cmp::min(nrows, ncols);
-    let output = A::svddc(
-        l,
-        UVTFlag::Some,
-        a.as_slice_memory_order_mut().expect("contiguous"),
-    )
-    .map_err(|_| Error::OperationFailure("did not converge".to_string()))?;
-    let u =
-        vec_into_array(l.resized(nrows, k), output.u.expect("`u` requested")).expect("valid shape");
-    let sigma = ArrayBase::from(output.s);
-    let vt = vec_into_array(l.resized(k, ncols), output.vt.expect("vt` requested"))
+    assert!(a.is_standard_layout());
+    let nrows = i32::try_from(a.nrows())
+        .map_err(|_| LayoutError::TooManyRows(format!("{} > {}", a.nrows(), i32::MAX)))?;
+    let ncols = i32::try_from(a.ncols())
+        .map_err(|_| LayoutError::TooManyColumns(format!("{} > {}", a.ncols(), i32::MAX)))?;
+    let a_ptr = a
+        .as_slice_memory_order_mut()
+        .ok_or(LayoutError::NotContiguous)?;
+    let output = unsafe { A::gesdd(nrows, ncols, a_ptr) }
+        .map_err(|_| Error::OperationFailure("did not converge".to_string()))?;
+    let k = cmp::min(a.nrows(), a.ncols());
+    let u = ArrayBase::from_shape_vec((a.nrows(), k), output.1).expect("valid shape");
+    let sigma = ArrayBase::from(output.0);
+    let vt = ArrayBase::from_shape_vec((k, a.ncols()), output.2.expect("`vt` requested"))
         .expect("valid shape");
     Ok((u, sigma, vt))
 }
@@ -262,26 +263,6 @@ where
         .slice(s![.., ..usize::try_from(k).expect("valid usize")])
         .to_owned();
     Ok(q)
-}
-
-fn vec_into_array<A>(l: MatrixLayout, a: Vec<A>) -> Result<Array2<A>, ShapeError> {
-    match l {
-        MatrixLayout::C { row, lda } => Ok(ArrayBase::from_shape_vec(
-            (
-                usize::try_from(row).expect("positive"),
-                usize::try_from(lda).expect("positive"),
-            ),
-            a,
-        )?),
-        MatrixLayout::F { col, lda } => Ok(ArrayBase::from_shape_vec(
-            (
-                usize::try_from(lda).expect("positive"),
-                usize::try_from(col).expect("positive"),
-            )
-                .f(),
-            a,
-        )?),
-    }
 }
 
 #[cfg(test)]

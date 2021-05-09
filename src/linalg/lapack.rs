@@ -8,6 +8,8 @@ pub(super) type SvdOutput<A> = (Vec<<A as Scalar>::Real>, Vec<A>, Option<Vec<A>>
 pub trait Lapack: Scalar {
     unsafe fn gelqf(m: i32, n: i32, a: &mut [Self], ld_a: i32) -> Result<Vec<Self>, i32>;
 
+    unsafe fn gesdd(m: i32, n: i32, a: &mut [Self]) -> Result<SvdOutput<Self>, i32>;
+
     unsafe fn gesvd(jobvt: u8, m: i32, n: i32, a: &mut [Self]) -> Result<SvdOutput<Self>, i32>;
 
     unsafe fn heev(
@@ -56,6 +58,39 @@ macro_rules! impl_lapack {
                 }
 
                 Ok(tau)
+            }
+
+            unsafe fn gesdd(m: i32, n: i32, mut a: &mut [Self]) -> Result<SvdOutput<Self>, i32> {
+                let k = cmp::min(m, n);
+                let mut s = vec_uninit(k as usize);
+                let mut u = vec_uninit((n * k) as usize);
+                let mut vt = vec_uninit((k * m) as usize);
+
+                $(
+                let mut $rwork_ident = {
+                    let max_dim = cmp::max(m, n) as usize;
+                    let min_dim = k as usize;
+                    let lwork = cmp::max(5 * min_dim * min_dim + 5 * max_dim + min_dim, 2 * max_dim * min_dim + 2 * min_dim * min_dim + min_dim);
+                    vec_uninit(lwork as usize)
+                };
+                )*
+
+                let mut info = 0;
+                let mut iwork = vec_uninit(8 * k as usize);
+                let mut work_size = [Self::zero()];
+                $gesdd(b'S', n, m, &mut a, n, &mut s, &mut u, n, &mut vt, k, &mut work_size, -1, $(&mut $rwork_ident,)* &mut iwork, &mut info);
+                if info != 0 {
+                    return Err(info);
+                }
+
+                let lwork = work_size[0].to_usize().expect("valid integer");
+                let mut work = vec_uninit(lwork);
+                $gesdd(b'S', n, m, &mut a, n, &mut s, &mut u, n, &mut vt, k, &mut work, lwork as i32, $(&mut $rwork_ident,)* &mut iwork, &mut info);
+                if info != 0 {
+                    return Err(info);
+                }
+
+                Ok((s, vt, Some(u)))
             }
 
             unsafe fn gesvd(jobvt: u8, m: i32, n: i32, mut a: &mut [Self]) -> Result<SvdOutput<Self>, i32> {
