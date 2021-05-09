@@ -3,7 +3,7 @@ mod lapack;
 use crate::linalg::lapack::Lapack;
 use crate::DecompositionError;
 use cauchy::Scalar;
-use lax::{layout::MatrixLayout, UVTFlag, SVDDC_, SVD_};
+use lax::{layout::MatrixLayout, UVTFlag, SVDDC_};
 use ndarray::{s, Array1, Array2, ArrayBase, Axis, Data, DataMut, Ix2, ShapeBuilder, ShapeError};
 use num_complex::{Complex32, Complex64};
 use std::cmp;
@@ -91,7 +91,7 @@ where
     Ok(())
 }
 
-pub trait LuPiv: Lapack + SVD_ + SVDDC_ + Sized {
+pub trait LuPiv: Lapack + SVDDC_ + Sized {
     unsafe fn lupiv(l: MatrixLayout, a: &mut [Self]) -> Pivot;
 }
 
@@ -181,27 +181,31 @@ where
 pub(crate) type SvdOutput<A> = (Array2<A>, Array1<<A as Scalar>::Real>, Option<Array2<A>>);
 
 /// Calls gesvd.
+///
+/// # Panics
+///
+/// Panics if `a`'s memory layout is not contiguous or not in the standard
+/// layout.
 pub(crate) fn svd<A, S>(a: &mut ArrayBase<S, Ix2>, calc_vt: bool) -> Result<SvdOutput<A>, Error>
 where
-    A: Scalar + SVD_,
+    A: Lapack,
     S: DataMut<Elem = A>,
 {
-    let l = lax_layout(a)?;
-    let nrows = i32::try_from(a.nrows()).expect("doesn't exceed i32::MAX");
-    let ncols = i32::try_from(a.ncols()).expect("doesn't exceed i32::MAX");
-    let output = A::svd(
-        l,
-        true,
-        calc_vt,
-        a.as_slice_memory_order_mut().expect("contiguous"),
-    )
-    .map_err(|_| Error::OperationFailure("did not converge".to_string()))?;
-    let u = vec_into_array(l.resized(nrows, nrows), output.u.expect("`u` requested"))
-        .expect("valid shape");
-    let sigma = ArrayBase::from(output.s);
+    assert!(a.is_standard_layout());
+    let nrows = i32::try_from(a.nrows())
+        .map_err(|_| LayoutError::TooManyRows(format!("{} > {}", a.nrows(), i32::MAX)))?;
+    let ncols = i32::try_from(a.ncols())
+        .map_err(|_| LayoutError::TooManyColumns(format!("{} > {}", a.ncols(), i32::MAX)))?;
+    let a_ptr = a
+        .as_slice_memory_order_mut()
+        .ok_or(LayoutError::NotContiguous)?;
+    let output = unsafe { A::gesvd(if calc_vt { b'A' } else { b'N' }, nrows, ncols, a_ptr) }
+        .map_err(|_| Error::OperationFailure("did not converge".to_string()))?;
+    let u = ArrayBase::from_shape_vec((a.nrows(), a.nrows()), output.1).expect("valid shape");
+    let sigma = ArrayBase::from(output.0);
     let vt = output
-        .vt
-        .map(|vt| vec_into_array(l.resized(ncols, ncols), vt).expect("valid shape"));
+        .2
+        .map(|vt| ArrayBase::from_shape_vec((a.ncols(), a.ncols()), vt).expect("valid shape"));
     Ok((u, sigma, vt))
 }
 
