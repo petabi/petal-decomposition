@@ -1,4 +1,4 @@
-use cauchy::Scalar;
+use lair::Scalar;
 use num_complex::{Complex32, Complex64};
 use num_traits::{ToPrimitive, Zero};
 use std::cmp;

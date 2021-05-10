@@ -1,10 +1,10 @@
 use crate::{
-    linalg::{self, eigh, svd, LuPiv},
+    linalg::{self, eigh, svd, Lapack},
     DecompositionError,
 };
-use cauchy::Scalar;
+use lair::{Real, Scalar};
 use ndarray::{Array1, Array2, ArrayBase, AssignElem, Axis, Data, DataMut, Ix2};
-use num_traits::FromPrimitive;
+use num_traits::{Float, FromPrimitive};
 use rand::{Rng, SeedableRng};
 use rand_distr::StandardNormal;
 #[cfg(target_pointer_width = "32")]
@@ -102,7 +102,7 @@ where
     ///   Decomposition routine fails.
     pub fn fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<(), DecompositionError>
     where
-        A: LuPiv,
+        A: Lapack,
         S: Data<Elem = A>,
     {
         self.inner_fit(input)?;
@@ -147,7 +147,7 @@ where
         input: &ArrayBase<S, Ix2>,
     ) -> Result<Array2<A>, DecompositionError>
     where
-        A: LuPiv,
+        A: Lapack,
         S: Data<Elem = A>,
     {
         let x = self.inner_fit(input)?;
@@ -164,7 +164,8 @@ where
     ///   Decomposition routine fails.
     fn inner_fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, linalg::Error>
     where
-        A: LuPiv,
+        A: Lapack,
+        A::Real: Float,
         S: Data<Elem = A>,
     {
         let n_components = cmp::min(input.nrows(), input.ncols());
@@ -194,7 +195,7 @@ where
             .take(n_components)
             .zip(k.lanes_mut(Axis(1)).into_iter())
         {
-            let d = A::from_real(*sigma_elem);
+            let d = (*sigma_elem).into();
             for (u_elem, k_elem) in u_col.iter().take(n_components).zip(k_row.iter_mut()) {
                 k_elem.assign_elem(*u_elem / d);
             }
@@ -209,7 +210,7 @@ where
         let w_init = Array2::<A>::from_shape_fn((n_components, n_components), |_| {
             let r = A::Real::from_f64(self.rng.sample(StandardNormal))
                 .expect("float to float conversion never fails");
-            A::from_real(r)
+            r.into()
         });
 
         let (w, n_iter) = ica_par(&x1, A::from_f64(1e-4).expect("float").re(), 200, &w_init);
@@ -322,7 +323,7 @@ fn ica_par<A, S>(
     w_init: &ArrayBase<S, Ix2>,
 ) -> (Array2<A>, usize)
 where
-    A: Scalar + LuPiv,
+    A: Scalar + Lapack,
     S: Data<Elem = A>,
 {
     let mut w = symmetric_decorrelation(w_init);
@@ -361,14 +362,15 @@ where
 
 fn symmetric_decorrelation<A, S>(input: &ArrayBase<S, Ix2>) -> Array2<A>
 where
-    A: Scalar + LuPiv,
+    A: Scalar + Lapack,
+    A::Real: Real,
     S: Data<Elem = A>,
 {
     let (e, mut v) = eigh(input.dot(&input.t())).unwrap();
     let v_t = v.t().to_owned();
     let e_sqrt_inv: Array1<A> = e
         .iter()
-        .map(|r| Scalar::from_real(A::one().re() / r.sqrt()))
+        .map(|r| (A::one().re() / r.sqrt()).into())
         .collect();
     for mut row in v.lanes_mut(Axis(1)) {
         for (v_e, s_e) in row.iter_mut().zip(e_sqrt_inv.iter()) {

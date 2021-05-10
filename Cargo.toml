@@ -37,13 +37,19 @@ netlib-system   = ["netlib-src/system"]
 openblas-static = ["openblas-src/static"]
 openblas-system = ["openblas-src/system"]
 
-serialization = ["serde", "ndarray/serde", "rand/serde1", "rand_pcg/serde1"]
+serialization = [
+    "serde",
+    "lair/serialization",
+    "ndarray/serde",
+    "rand/serde1",
+    "rand_pcg/serde1"
+]
 
 [dependencies]
 cauchy = "0.4"
 itertools = "0.10"
+lair = "0.5"
 lapack = "0.19"
-lapacke = "0.5"
 ndarray = "0.15"
 num-complex = "0.4"
 num-traits = "0.2"

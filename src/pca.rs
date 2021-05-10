@@ -1,7 +1,7 @@
-use crate::linalg::{self, lu_pl, qr, svd, svddc, LayoutError, LuPiv};
+use crate::linalg::{self, qr, svd, svddc, Lapack, LayoutError};
 use crate::DecompositionError;
-use cauchy::Scalar;
 use itertools::izip;
+use lair::{decomposition::lu, Scalar};
 use ndarray::{s, Array1, Array2, ArrayBase, AssignElem, Axis, Data, Ix2, ScalarOperand};
 use num_traits::{real::Real, FromPrimitive};
 use rand::{Rng, RngCore, SeedableRng};
@@ -68,7 +68,7 @@ where
 
 impl<A> Pca<A>
 where
-    A: Scalar + LuPiv,
+    A: FromPrimitive + Lapack,
     A::Real: ScalarOperand,
 {
     /// Returns the principal axes in feature space.
@@ -381,8 +381,8 @@ where
 
 impl<A, R> RandomizedPca<A, R>
 where
-    A: Scalar + LuPiv,
-    A::Real: ScalarOperand,
+    A: Scalar + FromPrimitive + Lapack,
+    A::Real: ScalarOperand + FromPrimitive,
     R: Rng,
 {
     /// Returns the principal axes in feature space.
@@ -669,7 +669,8 @@ fn randomized_svd<A, S, R>(
     rng: &mut R,
 ) -> Result<Svd<A>, linalg::Error>
 where
-    A: Scalar + LuPiv,
+    A: Scalar + Lapack,
+    A::Real: FromPrimitive,
     S: Data<Elem = A>,
     R: RngCore,
 {
@@ -690,22 +691,23 @@ fn randomized_range_finder<A, S, R>(
     rng: &mut R,
 ) -> Result<Array2<A>, LayoutError>
 where
-    A: Scalar + LuPiv,
+    A: Scalar + Lapack,
+    A::Real: FromPrimitive,
     S: Data<Elem = A>,
     R: RngCore,
 {
     let mut q = ArrayBase::from_shape_fn((input.ncols(), size), |_| {
         let r = A::Real::from_f64(rng.sample(StandardNormal))
             .expect("float to float conversion never fails");
-        A::from_real(r)
+        r.into()
     });
     let mut pl = q.view();
     q = input.dot(&pl);
     for _ in 0..n_iter {
-        lu_pl(&mut q)?;
+        q = lu::Factorized::from(q).into_pl();
         pl = q.slice(s![.., 0..cmp::min(q.nrows(), q.ncols())]);
         q = input.t().dot(&pl);
-        lu_pl(&mut q)?;
+        q = lu::Factorized::from(q).into_pl();
         pl = q.slice(s![.., 0..cmp::min(q.nrows(), q.ncols())]);
         q = input.dot(&pl);
     }
@@ -768,7 +770,7 @@ where
         .zip(u.slice(s![.., 0..n_components]).lanes(Axis(1)))
     {
         for (y_v, u_v, sigma_v) in izip!(y_row.into_iter(), u_row, singular) {
-            y_v.assign_elem(*u_v * A::from_real(*sigma_v));
+            y_v.assign_elem(*u_v * (*sigma_v).into());
         }
     }
     unsafe { y.assume_init() }
@@ -834,7 +836,7 @@ where
             };
         }
         if signum < A::zero().re() {
-            let signum = A::from_real(signum);
+            let signum = signum.into();
             for e in u_col {
                 *e *= signum;
             }
