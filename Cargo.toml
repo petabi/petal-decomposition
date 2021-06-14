@@ -76,7 +76,7 @@ features = ["cblas"]
 optional = true
 
 [dev-dependencies]
-approx = "0.4"
+approx = "0.5"
 ndarray = { version = "0.15", features = ["approx"] }
 serde_json = "1"
 
