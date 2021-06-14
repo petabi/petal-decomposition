@@ -195,7 +195,7 @@ where
             .take(n_components)
             .zip(k.lanes_mut(Axis(1)).into_iter())
         {
-            let d = (*sigma_elem).into();
+            let d = sigma_elem.into();
             for (u_elem, k_elem) in u_col.iter().take(n_components).zip(k_row.iter_mut()) {
                 k_elem.assign_elem(*u_elem / d);
             }
