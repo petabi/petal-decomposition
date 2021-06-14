@@ -5,6 +5,12 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2021-06-14
+
+### Changed
+
+- Requires ndarray 0.15.2 or later.
+
 ## [0.6.0] - 2021-05-10
 
 ### Changed
@@ -87,6 +93,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Principal component analysis (PCA).
 
+[0.6.1]: https://github.com/petabi/petal-decomposition/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/petabi/petal-decomposition/compare/0.5.1...0.6.0
 [0.5.1]: https://github.com/petabi/petal-decomposition/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/petabi/petal-decomposition/compare/0.4.1...0.5.0
