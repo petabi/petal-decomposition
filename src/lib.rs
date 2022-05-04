@@ -2,7 +2,7 @@
 //! (principal component analysis) and ICA (independent component analysis).
 
 #[cfg(any(feature = "intel-mkl-static", feature = "intel-mkl-system"))]
-extern crate intel_mkl_src as _src;
+extern crate mkl_src as _src;
 
 #[cfg(any(feature = "netlib_static", feature = "netlib-system"))]
 extern crate netlib_src as _src;
