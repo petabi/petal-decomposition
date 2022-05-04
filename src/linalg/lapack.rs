@@ -202,6 +202,13 @@ impl_lapack!(@real, f64, lapack::dsyev, lapack::dgelqf, lapack::dgesdd, lapack::
 impl_lapack!(@complex, Complex32, lapack::cheev, lapack::cgelqf, lapack::cgesdd, lapack::cgesvd, lapack::cunglq);
 impl_lapack!(@complex, Complex64, lapack::zheev, lapack::zgelqf, lapack::zgesdd, lapack::zgesvd, lapack::zunglq);
 
+/// Creates a vector with uninitialized elements.
+///
+/// # Safety
+///
+/// The caller must ensure that the elements of the vector are not used before
+/// they are initialized.
+#[allow(clippy::uninit_vec)]
 unsafe fn vec_uninit<T: Sized>(n: usize) -> Vec<T> {
     let mut v = Vec::with_capacity(n);
     v.set_len(n);
