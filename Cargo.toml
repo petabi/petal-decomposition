@@ -28,8 +28,8 @@ intel-mkl = ["intel-mkl-static"]
 netlib    = ["netlib-static"]
 openblas  = ["openblas-static"]
 
-intel-mkl-static = ["mkl-src/mkl-static-lp64-seq", "mkl-src/download"]
-intel-mkl-system = ["mkl-src/mkl-dynamic-lp64-seq"]
+intel-mkl-static = ["intel-mkl-src/mkl-static-lp64-seq", "intel-mkl-src/download"]
+intel-mkl-system = ["intel-mkl-src/mkl-dynamic-lp64-seq"]
 
 netlib-static   = ["netlib-src/static"]
 netlib-system   = ["netlib-src/system"]
@@ -46,6 +46,9 @@ serialization = [
 ]
 
 [dependencies]
+# A workaround for https://github.com/rust-math/intel-mkl-src/issues/68
+anyhow = "<1.0.49"
+
 itertools = "0.10"
 lair = "0.6"
 lapack = "0.19"
@@ -58,9 +61,8 @@ rand_pcg = "0.3"
 serde = { version = "1", features = ["derive"], optional = true }
 thiserror = "1"
 
-[dependencies.mkl-src]
-git = "https://github.com/njaard/mkl-src.git"
-rev = "4b561ff"
+[dependencies.intel-mkl-src]
+version = "0.6"
 default-features = false
 optional = true
 
