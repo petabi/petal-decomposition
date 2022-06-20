@@ -47,7 +47,7 @@ serialization = [
 
 [dependencies]
 # A workaround for https://github.com/rust-math/intel-mkl-src/issues/68
-anyhow = "<1.0.49"
+anyhow = "<1.0.59"
 
 itertools = "0.10"
 lair = "0.6"
