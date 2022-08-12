@@ -5,6 +5,13 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+* Updated intel-mkl-src to 0.7.
+* Requires Rust 1.54 or later.
+
 ## [0.6.2] - 2022-05-04
 
 ### Fixed
@@ -99,6 +106,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Principal component analysis (PCA).
 
+[Unreleased]: https://github.com/petabi/petal-decomposition/compare/0.6.2...main
 [0.6.2]: https://github.com/petabi/petal-decomposition/compare/0.6.1...0.6.2
 [0.6.1]: https://github.com/petabi/petal-decomposition/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/petabi/petal-decomposition/compare/0.5.1...0.6.0
