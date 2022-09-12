@@ -61,7 +61,7 @@ serde = { version = "1", features = ["derive"], optional = true }
 thiserror = "1"
 
 [dependencies.intel-mkl-src]
-version = "0.7"
+version = "0.8"
 default-features = false
 optional = true
 
