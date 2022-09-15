@@ -28,7 +28,7 @@ intel-mkl = ["intel-mkl-static"]
 netlib    = ["netlib-static"]
 openblas  = ["openblas-static"]
 
-intel-mkl-static = ["intel-mkl-src/mkl-static-lp64-seq", "intel-mkl-src/download"]
+intel-mkl-static = ["intel-mkl-src/mkl-static-lp64-seq"]
 intel-mkl-system = ["intel-mkl-src/mkl-dynamic-lp64-seq"]
 
 netlib-static   = ["netlib-src/static"]
@@ -61,7 +61,7 @@ serde = { version = "1", features = ["derive"], optional = true }
 thiserror = "1"
 
 [dependencies.intel-mkl-src]
-version = "0.7"
+version = "0.8"
 default-features = false
 optional = true
 
