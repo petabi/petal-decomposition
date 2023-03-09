@@ -162,6 +162,7 @@ where
     ///   incompatible with LAPACK.
     /// * [`DecompositionError::LinalgError`] if the underlying Singular Vector
     ///   Decomposition routine fails.
+    #[allow(clippy::manual_let_else)] // requires rust-version>=1.65
     fn inner_fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, linalg::Error>
     where
         A: Lapack,
