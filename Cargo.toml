@@ -12,7 +12,7 @@ license = "Apache-2.0"
 keywords = ["matrix", "decomposition", "pca", "ica", "dimensionality"]
 categories = ["mathematics", "science", "algorithms"]
 authors = ["Min Kim <msk@dolbo.net>"]
-edition = "2018"
+edition = "2021"
 exclude = ["./github"]
 
 [badges]
@@ -25,14 +25,17 @@ no-default-features = true
 default = []
 
 intel-mkl = ["intel-mkl-static"]
-netlib    = ["netlib-static"]
-openblas  = ["openblas-static"]
+netlib = ["netlib-static"]
+openblas = ["openblas-static"]
 
-intel-mkl-static = ["intel-mkl-src/mkl-static-lp64-seq", "intel-mkl-src/download"]
+intel-mkl-static = [
+    "intel-mkl-src/mkl-static-lp64-seq",
+    "intel-mkl-src/download",
+]
 intel-mkl-system = ["intel-mkl-src/mkl-dynamic-lp64-seq"]
 
-netlib-static   = ["netlib-src/static"]
-netlib-system   = ["netlib-src/system"]
+netlib-static = ["netlib-src/static"]
+netlib-system = ["netlib-src/system"]
 
 openblas-static = ["openblas-src/static"]
 openblas-system = ["openblas-src/system"]
@@ -42,7 +45,7 @@ serialization = [
     "lair/serialization",
     "ndarray/serde",
     "rand/serde1",
-    "rand_pcg/serde1"
+    "rand_pcg/serde1",
 ]
 
 [dependencies]
@@ -53,7 +56,7 @@ lair = "0.6"
 lapack = "0.19"
 ndarray = "0.15.2"
 num-complex = "0.4"
-num-traits = "0.2.15"  # 0.2.15 conflicts with lair-0.5
+num-traits = "0.2.15"                                             # 0.2.15 conflicts with lair-0.5
 rand = "0.8"
 rand_distr = "0.4"
 rand_pcg = "0.3"
