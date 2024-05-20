@@ -162,6 +162,7 @@ where
     ///   incompatible with LAPACK.
     /// * [`DecompositionError::LinalgError`] if the underlying Singular Vector
     ///   Decomposition routine fails.
+    #[allow(clippy::manual_let_else)] // requires rust-version>=1.65
     fn inner_fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, linalg::Error>
     where
         A: Lapack,
@@ -203,7 +204,7 @@ where
         let k = unsafe { k.assume_init() };
         let mut x1 = k.dot(&x);
         let n_features_sqrt = A::from_usize(n_features).expect("approximation").sqrt();
-        for x_elem in x1.iter_mut() {
+        for x_elem in &mut x1 {
             *x_elem *= n_features_sqrt;
         }
 
@@ -385,7 +386,7 @@ where
     A: Scalar,
     S: DataMut<Elem = A>,
 {
-    for elem in input.iter_mut() {
+    for elem in &mut input {
         *elem = elem.tanh();
     }
     let ncols = A::from_usize(input.ncols()).expect("approximation");
