@@ -29,10 +29,7 @@ intel-mkl = ["intel-mkl-static"]
 netlib = ["netlib-static"]
 openblas = ["openblas-static"]
 
-intel-mkl-static = [
-    "intel-mkl-src/mkl-static-lp64-seq",
-    "intel-mkl-src/download",
-]
+intel-mkl-static = ["intel-mkl-src/mkl-static-lp64-seq"]
 intel-mkl-system = ["intel-mkl-src/mkl-dynamic-lp64-seq"]
 
 netlib-static = ["netlib-src/static"]
@@ -52,12 +49,12 @@ serialization = [
 [dependencies]
 anyhow = "1"
 
-itertools = "0.10"
+itertools = "0.13"
 lair = "0.6"
 lapack = "0.19"
 ndarray = "0.15.2"
 num-complex = "0.4"
-num-traits = "0.2.15"                                             # 0.2.15 conflicts with lair-0.5
+num-traits = "0.2.15"
 rand = "0.8"
 rand_distr = "0.4"
 rand_pcg = "0.3"
@@ -65,7 +62,7 @@ serde = { version = "1", features = ["derive"], optional = true }
 thiserror = "1"
 
 [dependencies.intel-mkl-src]
-version = "0.7"
+version = "0.8.1"
 default-features = false
 optional = true
 
