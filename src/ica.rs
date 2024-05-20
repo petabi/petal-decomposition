@@ -162,7 +162,6 @@ where
     ///   incompatible with LAPACK.
     /// * [`DecompositionError::LinalgError`] if the underlying Singular Vector
     ///   Decomposition routine fails.
-    #[allow(clippy::manual_let_else)] // requires rust-version>=1.65
     fn inner_fit<S>(&mut self, input: &ArrayBase<S, Ix2>) -> Result<Array2<A>, linalg::Error>
     where
         A: Lapack,
@@ -170,9 +169,7 @@ where
         S: Data<Elem = A>,
     {
         let n_components = cmp::min(input.nrows(), input.ncols());
-        let means = if let Some(means) = input.mean_axis(Axis(0)) {
-            means
-        } else {
+        let Some(means) = input.mean_axis(Axis(0)) else {
             return Ok(Array2::<A>::zeros((0, input.ncols())));
         };
         let n_features = input.nrows();
