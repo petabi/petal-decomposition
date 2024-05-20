@@ -47,8 +47,6 @@ serialization = [
 ]
 
 [dependencies]
-anyhow = "1"
-
 itertools = "0.13"
 lair = "0.6"
 lapack = "0.19"
