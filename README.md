@@ -9,7 +9,7 @@ petal-decomposition provides matrix decomposition algorithms including PCA
 
 ## Requirements
 
-* BLAS/LAPACK backend (OpenBLAS, Netlib, or Intel MKL)
+* BLAS/LAPACK backend (OpenBLAS, Netlib, Intel MKL, or the Accelerate Framework)
 
 ## Features
 
@@ -23,6 +23,10 @@ petal-decomposition provides matrix decomposition algorithms including PCA
   `openblas-static`, and `openblas-system` to select a BLAS/LAPACK
   backend.
   See [ndarray-linalg's documentation][ndarray-linalg-features] for details.
+
+  **Note:** On macOS, the Accelerate Framework is used by default, so these
+  features are not needed.
+
 * `serialization` enables serialization/deserialization using [serde](https://crates.io/crates/serde).
 
 ## Examples
