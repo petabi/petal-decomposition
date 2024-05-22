@@ -12,10 +12,10 @@ jobs:
 
     steps:
     - name: Install Rust
-      uses: hecrj/setup-rust-action@v1
+      uses: dtolnay/rust-toolchain@master
       with:
-        rust-version: ${{ matrix.rust }}
-    - uses: actions/checkout@master
+        toolchain: ${{ matrix.rust }}
+    - uses: actions/checkout@v4
     - name: Install Tarpaulin
       if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       run: cargo install cargo-tarpaulin
@@ -31,16 +31,16 @@ jobs:
       run: cargo tarpaulin --out Xml --features "intel-mkl-static, serialization"
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3
 
   check:
     runs-on: ubuntu-latest
     steps:
     - name: Install Rust
-      uses: hecrj/setup-rust-action@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-        rust-version: stable
-    - uses: actions/checkout@master
+        components: clippy, rustfmt
+    - uses: actions/checkout@v4
     - name: Check formatting
       run: cargo fmt -- --check
     - name: Clippy
