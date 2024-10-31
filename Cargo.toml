@@ -19,6 +19,9 @@ exclude = ["./github"]
 [badges]
 codecov = { repository = "petabi/petal-decomposition", service = "github" }
 
+[lints.clippy]
+pedantic = "warn"
+
 [package.metadata.docs.rs]
 no-default-features = true
 
