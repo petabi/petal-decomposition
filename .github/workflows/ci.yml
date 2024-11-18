@@ -8,7 +8,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macOS-latest, windows-latest]
-        rust: [stable, 1.65]
+        rust: [stable, 1.67]
 
     steps:
       - name: Install Rust

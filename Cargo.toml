@@ -42,11 +42,11 @@ openblas-static = ["openblas-src/static"]
 openblas-system = ["openblas-src/system"]
 
 serialization = [
-    "serde",
-    "lair/serialization",
-    "ndarray/serde",
-    "rand/serde1",
-    "rand_pcg/serde1",
+  "serde",
+  "lair/serialization",
+  "ndarray/serde",
+  "rand/serde1",
+  "rand_pcg/serde1",
 ]
 
 [dependencies]
@@ -60,7 +60,7 @@ rand = "0.8"
 rand_distr = "0.4"
 rand_pcg = "0.3"
 serde = { version = "1", features = ["derive"], optional = true }
-thiserror = "1"
+thiserror = "2"
 
 [dependencies.intel-mkl-src]
 version = "0.8.1"
