@@ -11,42 +11,42 @@ jobs:
         rust: [stable, 1.65]
 
     steps:
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{ matrix.rust }}
-    - uses: actions/checkout@v4
-    - name: Install Tarpaulin
-      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
-      run: cargo install cargo-tarpaulin
-    - name: Run tests on macOS
-      if: matrix.os == 'macOS-latest'
-      run: |
-        cargo test --verbose --features "serialization"
-    - name: Run tests
-      if: matrix.os == 'ubuntu-latest' || matrix.os == 'windows-latest'
-      run: cargo test --verbose --features "intel-mkl-static, serialization"
-    - name: Generate coverage report
-      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
-      run: cargo tarpaulin --out Xml --features "intel-mkl-static, serialization"
-    - name: Upload coverage to Codecov
-      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
-      uses: codecov/codecov-action@v4
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      with:
-        files: ./tarpaulin-report.xml
-        fail_ci_if_error: true
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      - uses: actions/checkout@v4
+      - name: Install Tarpaulin
+        if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
+        run: cargo install cargo-tarpaulin
+      - name: Run tests on macOS
+        if: matrix.os == 'macOS-latest'
+        run: |
+          cargo test --verbose --features "serialization"
+      - name: Run tests
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'windows-latest'
+        run: cargo test --verbose --features "intel-mkl-static, serialization"
+      - name: Generate coverage report
+        if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
+        run: cargo tarpaulin --out Xml --features "intel-mkl-static, serialization"
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
+        uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          files: ./tarpaulin-report.xml
+          fail_ci_if_error: true
 
   check:
     runs-on: ubuntu-latest
     steps:
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: clippy, rustfmt
-    - uses: actions/checkout@v4
-    - name: Check formatting
-      run: cargo fmt -- --check
-    - name: Clippy
-      run: cargo clippy -- -D warnings
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: actions/checkout@v4
+      - name: Check formatting
+        run: cargo fmt -- --check
+      - name: Clippy
+        run: cargo clippy -- -D warnings
