@@ -3,6 +3,21 @@ name: CI
 on: [push, pull_request]
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: actions/checkout@v4
+      - name: Check formatting
+        run: cargo fmt -- --check
+      - name: Clippy
+        run: cargo clippy -- -D warnings
+      - name: markdownlint
+        uses: articulate/actions-markdownlint@v1
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -37,16 +52,3 @@ jobs:
         with:
           files: ./tarpaulin-report.xml
           fail_ci_if_error: true
-
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-      - uses: actions/checkout@v4
-      - name: Check formatting
-        run: cargo fmt -- --check
-      - name: Clippy
-        run: cargo clippy -- -D warnings
