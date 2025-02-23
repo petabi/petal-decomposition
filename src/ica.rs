@@ -58,7 +58,7 @@ where
     /// initialized with a randomly-generated seed.
     #[must_use]
     pub fn new() -> Self {
-        let seed: u128 = rand::thread_rng().gen();
+        let seed: u128 = rand::rng().random();
         Self::with_seed(seed)
     }
 
@@ -251,7 +251,7 @@ impl FastIcaBuilder<Pcg> {
     /// initialized with a randomly-generated seed.
     #[must_use]
     pub fn new() -> Self {
-        let seed: u128 = rand::thread_rng().gen();
+        let seed: u128 = rand::rng().random();
         Self {
             rng: Pcg::from_seed(seed.to_be_bytes()),
         }
@@ -307,7 +307,7 @@ impl<R: Rng> FastIcaBuilder<R> {
 
 impl Default for FastIcaBuilder<Pcg> {
     fn default() -> Self {
-        let seed: u128 = rand::thread_rng().gen();
+        let seed: u128 = rand::rng().random();
         Self {
             rng: Pcg::from_seed(seed.to_be_bytes()),
         }

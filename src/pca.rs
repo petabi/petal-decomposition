@@ -338,7 +338,7 @@ where
     /// randomly-generated seed.
     #[must_use]
     pub fn new(n_components: usize) -> Self {
-        let seed: u128 = rand::thread_rng().gen();
+        let seed: u128 = rand::rng().random();
         Self::with_seed(n_components, seed)
     }
 
@@ -574,7 +574,7 @@ impl RandomizedPcaBuilder<Pcg> {
     /// randomly-generated seed.
     #[must_use]
     pub fn new(n_components: usize) -> Self {
-        let seed: u128 = rand::thread_rng().gen();
+        let seed: u128 = rand::rng().random();
         Self {
             n_components,
             rng: Pcg::from_seed(seed.to_be_bytes()),
@@ -960,7 +960,7 @@ mod test {
         let z = pca.inverse_transform(&y).expect("valid input");
         assert!(z.abs_diff_eq(&x, 1e-10));
 
-        let mut pca = super::RandomizedPca::with_rng(1, rand::thread_rng());
+        let mut pca = super::RandomizedPca::with_rng(1, rand::rng());
         let y = pca.fit_transform(&x).unwrap();
         assert_abs_diff_eq!(y[(0, 0)].abs(), 5., epsilon = 1e-10);
         assert_abs_diff_eq!(y[(1, 0)], 0., epsilon = 1e-10);
@@ -977,7 +977,7 @@ mod test {
             [2_f64, 1_f64],
             [3_f64, 2_f64],
         ]);
-        let mut pca = super::RandomizedPca::with_rng(2, rand::thread_rng());
+        let mut pca = super::RandomizedPca::with_rng(2, rand::rng());
         assert!(pca.fit(&x).is_ok());
         let ratio = pca.explained_variance_ratio();
         assert!(ratio.get(0).unwrap() > &0.99244);
