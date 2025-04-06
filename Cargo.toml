@@ -22,9 +22,6 @@ codecov = { repository = "petabi/petal-decomposition", service = "github" }
 [lints.clippy]
 pedantic = "warn"
 
-[package.metadata.docs.rs]
-no-default-features = true
-
 [features]
 default = []
 
@@ -84,5 +81,6 @@ approx = "0.5"
 ndarray = { version = "0.16", features = ["approx"] }
 serde_json = "1"
 
-[packages.metadata.docs.rs]
+[package.metadata.docs.rs]
+no-default-features = true
 features = ["serialization"]
