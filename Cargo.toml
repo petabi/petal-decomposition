@@ -65,7 +65,7 @@ default-features = false
 optional = true
 
 [dependencies.netlib-src]
-version = "0.8"
+version = "0.9"
 default-features = false
 features = ["cblas"]
 optional = true
