@@ -31,24 +31,30 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - uses: actions/checkout@v4
-      - name: Install Tarpaulin
-        if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
-        run: cargo install cargo-tarpaulin
       - name: Run tests on macOS
         if: matrix.os == 'macOS-latest'
         run: |
           cargo test --verbose --features "serialization"
       - name: Run tests
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'windows-latest'
-        run: cargo test --verbose --features "intel-mkl-static, serialization"
-      - name: Generate coverage report
-        if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
-        run: cargo tarpaulin --out Xml --features "intel-mkl-static, serialization"
+        run: cargo test --verbose --features "intel-mkl-static,serialization"
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - name: Generate code coverage
+        run: cargo llvm-cov --features "intel-mkl-static,serialization" --workspace --lcov --output-path lcov.info
       - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
         uses: codecov/codecov-action@v4
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          files: ./tarpaulin-report.xml
+          files: lcov.info
           fail_ci_if_error: true
