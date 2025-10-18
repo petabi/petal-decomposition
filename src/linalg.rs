@@ -1,11 +1,13 @@
 mod lapack;
 
-pub(crate) use crate::linalg::lapack::Lapack;
-use crate::DecompositionError;
-use lair::Scalar;
-use ndarray::{s, Array1, Array2, ArrayBase, DataMut, Ix2};
 use std::cmp;
 use std::convert::TryFrom;
+
+use lair::Scalar;
+use ndarray::{s, Array1, Array2, ArrayBase, DataMut, Ix2};
+
+pub(crate) use crate::linalg::lapack::Lapack;
+use crate::DecompositionError;
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum Error {

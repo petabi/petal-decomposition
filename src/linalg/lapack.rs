@@ -4,10 +4,11 @@
     clippy::cast_possible_wrap
 )]
 
+use std::cmp;
+
 use lair::Scalar;
 use num_complex::{Complex32, Complex64};
 use num_traits::{ToPrimitive, Zero};
-use std::cmp;
 
 pub(super) type SvdOutput<A> = (Vec<<A as Scalar>::Real>, Vec<A>, Option<Vec<A>>);
 

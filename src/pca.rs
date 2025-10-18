@@ -1,5 +1,5 @@
-use crate::linalg::{self, qr, svd, svddc, Lapack, LayoutError};
-use crate::DecompositionError;
+use std::cmp;
+
 use itertools::izip;
 use lair::{decomposition::lu, Scalar};
 use ndarray::{s, Array1, Array2, ArrayBase, AssignElem, Axis, Data, Ix2, ScalarOperand};
@@ -12,7 +12,9 @@ use rand_pcg::Lcg64Xsh32 as Pcg;
 use rand_pcg::Mcg128Xsl64 as Pcg;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::cmp;
+
+use crate::linalg::{self, qr, svd, svddc, Lapack, LayoutError};
+use crate::DecompositionError;
 
 /// Principal component analysis.
 ///
@@ -855,7 +857,7 @@ mod test {
     use rand_distr::StandardNormal;
     use rand_pcg::Pcg64Mcg;
 
-    const RNG_SEED: u128 = 1234567891011121314;
+    const RNG_SEED: u128 = 1_234_567_891_011_121_314;
 
     #[test]
     fn pca_zero_component() {
