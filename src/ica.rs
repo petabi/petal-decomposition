@@ -1,7 +1,5 @@
-use crate::{
-    linalg::{self, eigh, svd, Lapack},
-    DecompositionError,
-};
+use std::cmp;
+
 use lair::{Real, Scalar};
 use ndarray::{Array1, Array2, ArrayBase, AssignElem, Axis, Data, DataMut, Ix2};
 use num_traits::{Float, FromPrimitive};
@@ -13,7 +11,11 @@ use rand_pcg::Lcg64Xsh32 as Pcg;
 use rand_pcg::Mcg128Xsl64 as Pcg;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::cmp;
+
+use crate::{
+    linalg::{self, eigh, svd, Lapack},
+    DecompositionError,
+};
 
 /// Independent component analysis using the [FastICA] algorithm.
 ///
@@ -400,7 +402,7 @@ mod test {
     use approx::{assert_abs_diff_eq, assert_relative_eq};
     use ndarray::arr2;
 
-    const RNG_SEED: u128 = 1234567891011121314;
+    const RNG_SEED: u128 = 1_234_567_891_011_121_314;
 
     #[test]
     fn fast_ica_fit_transform() {
@@ -434,10 +436,10 @@ mod test {
         let x = arr2(&[[-0.5, 0.5], [-0.3, 0.3]]);
         let w = arr2(&[[1., 2.], [3., 4.]]);
         let (y, n) = super::ica_par(&x, 0.5, 1, &w);
-        assert_abs_diff_eq!(y[(0, 0)], 0.51449576, epsilon = 1e-8);
-        assert_abs_diff_eq!(y[(0, 1)], -0.85749293, epsilon = 1e-8);
-        assert_abs_diff_eq!(y[(1, 0)], -0.85749293, epsilon = 1e-8);
-        assert_abs_diff_eq!(y[(1, 1)], -0.51449576, epsilon = 1e-8);
+        assert_abs_diff_eq!(y[(0, 0)], 0.514_495_76, epsilon = 1e-8);
+        assert_abs_diff_eq!(y[(0, 1)], -0.857_492_93, epsilon = 1e-8);
+        assert_abs_diff_eq!(y[(1, 0)], -0.857_492_93, epsilon = 1e-8);
+        assert_abs_diff_eq!(y[(1, 1)], -0.514_495_76, epsilon = 1e-8);
         assert_eq!(n, 1);
     }
 
@@ -446,10 +448,10 @@ mod test {
         let x = arr2(&[[1., -1.], [0., 0.]]);
         let w = arr2(&[[1., 2.], [3., 4.]]);
         let (y, n) = super::ica_par(&x, 1e-4, 200, &w);
-        assert_abs_diff_eq!(y[(0, 0)], -0.00172682, epsilon = 1e-8);
-        assert_abs_diff_eq!(y[(0, 1)], 0.99999851, epsilon = 1e-8);
-        assert_abs_diff_eq!(y[(1, 0)], 0.99999851, epsilon = 1e-8);
-        assert_abs_diff_eq!(y[(1, 1)], 0.00172682, epsilon = 1e-8);
+        assert_abs_diff_eq!(y[(0, 0)], -0.001_726_82, epsilon = 1e-8);
+        assert_abs_diff_eq!(y[(0, 1)], 0.999_998_51, epsilon = 1e-8);
+        assert_abs_diff_eq!(y[(1, 0)], 0.999_998_51, epsilon = 1e-8);
+        assert_abs_diff_eq!(y[(1, 1)], 0.001_726_82, epsilon = 1e-8);
         assert_eq!(n, 6);
     }
 
@@ -457,21 +459,21 @@ mod test {
     fn logcosh() {
         let x = arr2(&[[1., 2.], [3., 4.]]);
         let (x, y) = super::logcosh(x);
-        assert_relative_eq!(x[(0, 0)], 0.76159416, max_relative = 1e-8);
-        assert_relative_eq!(x[(0, 1)], 0.96402758, max_relative = 1e-8);
-        assert_relative_eq!(x[(1, 0)], 0.99505475, max_relative = 1e-8);
-        assert_relative_eq!(x[(1, 1)], 0.99932930, max_relative = 1e-8);
-        assert_relative_eq!(y[0], 0.24531258, max_relative = 1e-6);
-        assert_relative_eq!(y[1], 0.00560349, max_relative = 1e-6);
+        assert_relative_eq!(x[(0, 0)], 0.761_594_16, max_relative = 1e-8);
+        assert_relative_eq!(x[(0, 1)], 0.964_027_58, max_relative = 1e-8);
+        assert_relative_eq!(x[(1, 0)], 0.995_054_75, max_relative = 1e-8);
+        assert_relative_eq!(x[(1, 1)], 0.999_329_30, max_relative = 1e-8);
+        assert_relative_eq!(y[0], 0.245_312_58, max_relative = 1e-6);
+        assert_relative_eq!(y[1], 0.005_603_49, max_relative = 1e-6);
     }
 
     #[test]
     fn symmetric_decorrelation() {
         let x = arr2(&[[33., 24.], [48., 57.]]);
         let w = super::symmetric_decorrelation(&x);
-        assert_relative_eq!(w[(0, 0)], 0.96623494, max_relative = 1e-8);
-        assert_relative_eq!(w[(0, 1)], -0.25766265, max_relative = 1e-8);
-        assert_relative_eq!(w[(1, 0)], 0.25766265, max_relative = 1e-8);
-        assert_relative_eq!(w[(1, 1)], 0.96623494, max_relative = 1e-8);
+        assert_relative_eq!(w[(0, 0)], 0.966_234_94, max_relative = 1e-8);
+        assert_relative_eq!(w[(0, 1)], -0.257_662_65, max_relative = 1e-8);
+        assert_relative_eq!(w[(1, 0)], 0.257_662_65, max_relative = 1e-8);
+        assert_relative_eq!(w[(1, 1)], 0.966_234_94, max_relative = 1e-8);
     }
 }
