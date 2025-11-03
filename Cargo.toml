@@ -50,7 +50,7 @@ serialization = [
 itertools = "0.14"
 lair = "0.7"
 lapack = "0.20"
-ndarray = "0.16.1"
+ndarray = "0.17.1"
 num-complex = "0.4"
 num-traits = "0.2.15"
 rand = "0.9"
@@ -78,7 +78,7 @@ optional = true
 
 [dev-dependencies]
 approx = "0.5"
-ndarray = { version = "0.16", features = ["approx"] }
+ndarray = { version = "0.17", features = ["approx"] }
 serde_json = "1"
 
 [package.metadata.docs.rs]
