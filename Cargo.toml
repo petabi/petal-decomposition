@@ -48,7 +48,7 @@ serialization = [
 
 [dependencies]
 itertools = "0.14"
-lair = "0.7"
+lair = "0.8"
 lapack = "0.20"
 ndarray = "0.16.1"
 num-complex = "0.4"
