@@ -49,7 +49,7 @@ let y = pca.transform(&x).unwrap();       // [-2_f64.sqrt(), 0_f64, 2_f64.sqrt()
 
 ## License
 
-Copyright 2020-2024 Petabi, Inc.
+Copyright 2020-2025 Petabi, Inc.
 
 Licensed under [Apache License, Version 2.0][apache-license] (the "License");
 you may not use this crate except in compliance with the License.
