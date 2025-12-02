@@ -9,7 +9,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-* Requires Rust 1.82.0 or later.
+* Requires Rust 1.83 or later.
+* Updated ndarray to 0.17.1.
 * Updated rand to 0.9.
 
 ## [0.8.0] - 2024-11-01
