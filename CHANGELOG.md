@@ -9,7 +9,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Chagned
 
-* Requires Rust 1.85 or later.
+* Requires Rust 1.86 or later.
 
 ## [0.9.0] - 2025-12-02
 

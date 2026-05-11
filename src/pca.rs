@@ -4,7 +4,7 @@ use itertools::izip;
 use lair::{Scalar, decomposition::lu};
 use ndarray::{Array1, Array2, ArrayBase, AssignElem, Axis, Data, Ix2, ScalarOperand, s};
 use num_traits::{FromPrimitive, real::Real};
-use rand::{Rng, RngCore, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rand_distr::StandardNormal;
 #[cfg(target_pointer_width = "32")]
 use rand_pcg::Lcg64Xsh32 as Pcg;
@@ -674,7 +674,7 @@ where
     A: Scalar + Lapack,
     A::Real: FromPrimitive,
     S: Data<Elem = A>,
-    R: RngCore,
+    R: Rng,
 {
     let n_random = n_components + 10; // oversample by 10
     let q = randomized_range_finder(input, n_random, 7, rng)?;
@@ -696,7 +696,7 @@ where
     A: Scalar + Lapack,
     A::Real: FromPrimitive,
     S: Data<Elem = A>,
-    R: RngCore,
+    R: Rng,
 {
     let mut q = ArrayBase::from_shape_fn((input.ncols(), size), |_| {
         let r = A::Real::from_f64(rng.sample(StandardNormal))
@@ -853,7 +853,7 @@ where
 mod test {
     use approx::{assert_abs_diff_eq, assert_relative_eq};
     use ndarray::{Array2, arr2};
-    use rand::Rng;
+    use rand::RngExt;
     use rand_distr::StandardNormal;
     use rand_pcg::Pcg64Mcg;
 

@@ -3,7 +3,7 @@ use std::cmp;
 use lair::{Real, Scalar};
 use ndarray::{Array1, Array2, ArrayBase, AssignElem, Axis, Data, DataMut, Ix2};
 use num_traits::{Float, FromPrimitive};
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rand_distr::StandardNormal;
 #[cfg(target_pointer_width = "32")]
 use rand_pcg::Lcg64Xsh32 as Pcg;
