@@ -12,8 +12,8 @@ license = "Apache-2.0"
 keywords = ["matrix", "decomposition", "pca", "ica", "dimensionality"]
 categories = ["mathematics", "science", "algorithms"]
 authors = ["Min Kim <msk@dolbo.net>"]
-edition = "2021"
-rust-version = "1.83"
+edition = "2024"
+rust-version = "1.85"
 exclude = ["./github"]
 
 [badges]

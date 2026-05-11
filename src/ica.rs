@@ -13,8 +13,8 @@ use rand_pcg::Mcg128Xsl64 as Pcg;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    linalg::{self, eigh, svd, Lapack},
     DecompositionError,
+    linalg::{self, Lapack, eigh, svd},
 };
 
 /// Independent component analysis using the [FastICA] algorithm.

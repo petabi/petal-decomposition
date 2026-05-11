@@ -1,9 +1,9 @@
 use std::cmp;
 
 use itertools::izip;
-use lair::{decomposition::lu, Scalar};
-use ndarray::{s, Array1, Array2, ArrayBase, AssignElem, Axis, Data, Ix2, ScalarOperand};
-use num_traits::{real::Real, FromPrimitive};
+use lair::{Scalar, decomposition::lu};
+use ndarray::{Array1, Array2, ArrayBase, AssignElem, Axis, Data, Ix2, ScalarOperand, s};
+use num_traits::{FromPrimitive, real::Real};
 use rand::{Rng, RngCore, SeedableRng};
 use rand_distr::StandardNormal;
 #[cfg(target_pointer_width = "32")]
@@ -13,8 +13,8 @@ use rand_pcg::Mcg128Xsl64 as Pcg;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::linalg::{self, qr, svd, svddc, Lapack, LayoutError};
 use crate::DecompositionError;
+use crate::linalg::{self, Lapack, LayoutError, qr, svd, svddc};
 
 /// Principal component analysis.
 ///
@@ -852,7 +852,7 @@ where
 #[cfg(test)]
 mod test {
     use approx::{assert_abs_diff_eq, assert_relative_eq};
-    use ndarray::{arr2, Array2};
+    use ndarray::{Array2, arr2};
     use rand::Rng;
     use rand_distr::StandardNormal;
     use rand_pcg::Pcg64Mcg;
@@ -940,9 +940,11 @@ mod test {
         assert!(pca.fit(&x).is_ok());
         let serialized = serde_json::to_string(&pca).unwrap();
         let deserialized: super::Pca<f32> = serde_json::from_str(&serialized).unwrap();
-        assert!(deserialized
-            .components()
-            .abs_diff_eq(pca.components(), 1e-12));
+        assert!(
+            deserialized
+                .components()
+                .abs_diff_eq(pca.components(), 1e-12)
+        );
         assert!(deserialized.mean().abs_diff_eq(pca.mean(), 1e12));
     }
 
@@ -1034,9 +1036,11 @@ mod test {
         assert!(pca.fit(&x).is_ok());
         let serialized = serde_json::to_string(&pca).unwrap();
         let deserialized: super::Pca<f32> = serde_json::from_str(&serialized).unwrap();
-        assert!(deserialized
-            .components()
-            .abs_diff_eq(pca.components(), 1e-12));
+        assert!(
+            deserialized
+                .components()
+                .abs_diff_eq(pca.components(), 1e-12)
+        );
         assert!(deserialized.mean().abs_diff_eq(pca.mean(), 1e12));
     }
 
