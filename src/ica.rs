@@ -191,9 +191,9 @@ where
         for ((u_col, sigma_elem), mut k_row) in u
             .lanes(Axis(0))
             .into_iter()
-            .zip(sigma.into_iter())
+            .zip(sigma)
             .take(n_components)
-            .zip(k.lanes_mut(Axis(1)).into_iter())
+            .zip(k.lanes_mut(Axis(1)))
         {
             let d = sigma_elem.into();
             for (u_elem, k_elem) in u_col.iter().take(n_components).zip(k_row.iter_mut()) {
@@ -334,7 +334,7 @@ where
         for (mut dot_row, (&g_wtx_elem, w_row)) in gwtx_dot
             .lanes_mut(Axis(1))
             .into_iter()
-            .zip(g_wtx.iter().zip(w.lanes(Axis(1)).into_iter()))
+            .zip(g_wtx.iter().zip(w.lanes(Axis(1))))
         {
             for (dot_elem, w_elem) in dot_row.iter_mut().zip(w_row.iter()) {
                 *dot_elem = *dot_elem * p_inv - g_wtx_elem * *w_elem;
@@ -345,7 +345,7 @@ where
         for d in w1
             .lanes(Axis(1))
             .into_iter()
-            .zip(w.lanes(Axis(0)).into_iter())
+            .zip(w.lanes(Axis(0)))
             .map(|(w1_row, w_col)| (w1_row.dot(&w_col).abs() - A::one().re()).abs())
         {
             if d > lim {
