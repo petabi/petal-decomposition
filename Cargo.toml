@@ -47,7 +47,7 @@ serialization = [
 ]
 
 [dependencies]
-itertools = "0.14"
+itertools = "0.15"
 lair = "0.8"
 lapack = "0.20"
 ndarray = "0.17.1"
